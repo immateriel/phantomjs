@@ -14,6 +14,7 @@ HEADERS += csconverter.h \
     callback.h \
     webpage.h \
     webserver.h \
+    socketserver.h \
     consts.h \
     utils.h \
     networkaccessmanager.h \
@@ -31,6 +32,7 @@ SOURCES += phantom.cpp \
     callback.cpp \
     webpage.cpp \
     webserver.cpp \
+    socketserver.cpp \
     main.cpp \
     csconverter.cpp \
     utils.cpp \

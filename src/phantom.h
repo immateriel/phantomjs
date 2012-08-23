@@ -32,6 +32,7 @@
 #define PHANTOM_H
 
 #include <QPointer>
+#include <QTcpSocket>
 
 #include "csconverter.h"
 #include "filesystem.h"
@@ -42,6 +43,7 @@
 
 class WebPage;
 class WebServer;
+class SocketServer;
 
 class Phantom: public REPLCompletable
 {
@@ -114,6 +116,7 @@ signals:
 
 private slots:
     void printConsoleMessage(const QString &msg);
+    void copyJsConsoleMessageToClientSocket(const QString &message);
 
     void onInitialized();
 
@@ -133,6 +136,7 @@ private:
     QList<QPointer<WebServer> > m_servers;
     Config m_config;
     QVariantMap m_keyMap;
+    SocketServer *socketServer;
 };
 
 #endif // PHANTOM_H

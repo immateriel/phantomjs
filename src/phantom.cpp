@@ -37,6 +37,16 @@
 // note: QMetaObject apparently does not define QMetaEnum...
 #include <qmetaobject.h>
 #include <QWebPage>
+#include <QThread>
+
+#include <iostream>
+#include <QTcpServer>
+#include <QTextCodec>
+#include <QTcpSocket>
+#include <QObject>
+#include <QAbstractSocket>
+using namespace std;
+#include <unistd.h>
 
 #include "consts.h"
 #include "terminal.h"
@@ -46,6 +56,8 @@
 #include "repl.h"
 #include "system.h"
 #include "callback.h"
+
+#include "socketserver.h"
 
 static Phantom *phantomInstance = NULL;
 
@@ -126,6 +138,8 @@ void Phantom::init()
 
     connect(m_page, SIGNAL(javaScriptConsoleMessageSent(QString)),
             SLOT(printConsoleMessage(QString)));
+    connect(m_page, SIGNAL(javaScriptConsoleMessageSent(QString)),
+            SLOT(copyJsConsoleMessageToClientSocket(QString)));
     connect(m_page, SIGNAL(initialized()),
             SLOT(onInitialized()));
 
@@ -140,6 +154,8 @@ void Phantom::init()
     m_page->applySettings(m_defaultPageSettings);
 
     setLibraryPath(QFileInfo(m_config.scriptFile()).dir().absolutePath());
+
+    this->socketServer = NULL;
 }
 
 // public:
@@ -182,9 +198,21 @@ bool Phantom::execute()
         return false;
 
     if (m_config.scriptFile().isEmpty()) {
+#if 1
+      cout << "Coucou" << endl;
+
+      QThread *thread = new QThread();
+      socketServer = new SocketServer();
+      socketServer->setup(m_page->mainFrame());
+      socketServer->moveToThread(thread);
+      thread->start();
+      QMetaObject::invokeMethod(socketServer, "doWork", Qt::QueuedConnection);
+      cout << "ici aussi" << endl;
+#else
         // REPL mode requested
         // Create the REPL: it will launch itself, no need to store this variable.
         REPL::getInstance(m_page->mainFrame(), this);
+#endif
     } else {
         // Load the User Script
         if (m_config.debug()) {
@@ -337,6 +365,18 @@ void Phantom::debugExit(int code)
 void Phantom::printConsoleMessage(const QString &message)
 {
     Terminal::instance()->cout(message);
+}
+
+void Phantom::copyJsConsoleMessageToClientSocket(const QString &message)
+{
+  cout << "Oui on m'appelle pour envoyer sur le socket client" << endl;
+  Terminal::instance()->cout(message);
+
+  if (socketServer != NULL)
+    {
+      QMetaObject::invokeMethod(socketServer, "sendConsoleMessage", Qt::DirectConnection,
+				Q_ARG(QString, message));
+    }	
 }
 
 void Phantom::onInitialized()
