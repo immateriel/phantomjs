@@ -259,11 +259,24 @@ private:
     friend class WebPage;
 };
 
+class UnsupportedContentReadyListener : public QObject
+{
+  Q_OBJECT
+public:
+  UnsupportedContentReadyListener(WebPage *wp, QNetworkReply *r);
+public slots:
+  void handleUnsupportedContentReady();
+private:
+  WebPage *m_webpage;
+  QNetworkReply *m_reply;
+};
+
 
 WebPage::WebPage(QObject *parent, const QUrl &baseUrl)
     : REPLCompletable(parent)
     , m_callbacks(NULL)
     , m_navigationLocked(false)
+    , m_uc_idCounter(0)
 {
     setObjectName("WebPage");
     m_customWebPage = new CustomPage(this);
@@ -317,7 +330,89 @@ WebPage::WebPage(QObject *parent, const QUrl &baseUrl)
     connect(m_networkAccessManager, SIGNAL(resourceReceived(QVariant)),
             SIGNAL(resourceReceived(QVariant)));
 
+    // unsupported content downloader
+    connect(m_customWebPage, SIGNAL(unsupportedContent(QNetworkReply*)), SLOT(handleUnsupportedContent(QNetworkReply*))); 
+
     m_customWebPage->setViewportSize(QSize(400, 300));
+}
+
+UnsupportedContentReadyListener::UnsupportedContentReadyListener(WebPage *wp, QNetworkReply *r) 
+  : m_webpage(wp)
+  , m_reply(r)
+{
+
+}
+
+void UnsupportedContentReadyListener::handleUnsupportedContentReady()
+{
+  QVariantList headers;
+  foreach (QByteArray headerName, m_reply->rawHeaderList()) {
+    QVariantMap header;
+    header["name"] = QString::fromUtf8(headerName);
+    header["value"] = QString::fromUtf8(m_reply->rawHeader(headerName));
+    headers += header;
+  }
+
+  QVariantMap data;
+  data["id"] = m_webpage->getInternalIdFromReply(m_reply);
+  data["url"] = m_reply->url().toEncoded().data();
+  data["status"] = m_reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
+  data["statusText"] = m_reply->attribute(QNetworkRequest::HttpReasonPhraseAttribute);
+  data["contentType"] = m_reply->header(QNetworkRequest::ContentTypeHeader);
+  data["redirectURL"] = m_reply->header(QNetworkRequest::LocationHeader);
+  data["headers"] = headers;
+  data["time"] = QDateTime::currentDateTime();
+
+  m_webpage->emitUnsupportedContentReceived(data);
+}
+
+void WebPage::emitUnsupportedContentReceived(QVariantMap data)
+{
+  emit unsupportedContentReceived(data);
+}
+
+int WebPage::getInternalIdFromReply(QNetworkReply *reply)
+{
+  return m_uc_ids[reply];
+}
+
+void WebPage::handleUnsupportedContent(QNetworkReply *reply) 
+{
+  if (m_uc_ids.contains(reply))
+    return;
+  m_uc_idCounter++;
+  m_uc_ids[reply] = m_uc_idCounter;
+  m_uc_replies[m_uc_idCounter] = reply;
+
+  UnsupportedContentReadyListener *ucrl = new UnsupportedContentReadyListener(this, reply);
+  connect(reply, SIGNAL(finished()), ucrl, SLOT(handleUnsupportedContentReady()));
+}
+
+void WebPage::saveUnsupportedContent(const QString &fileName, const QVariant &arg1) 
+{
+  int id = arg1.toInt();
+  QNetworkReply *reply = m_uc_replies[id];
+  if (!reply)
+    return;
+
+  QFileInfo fileInfo(fileName);
+  QDir dir;
+  dir.mkpath(fileInfo.absolutePath());
+
+  QFile outFile(fileName);
+  outFile.open(QIODevice::WriteOnly);
+  char buf[1024*1024];
+  qint64 readBytes = 0;
+  while (!reply->atEnd()) {
+    readBytes = reply->read(buf, sizeof(buf));
+    if (readBytes > 0) {
+      outFile.write(buf, readBytes);
+    }
+  }
+  outFile.close();
+
+  m_uc_replies.remove(id);
+
 }
 
 QWebFrame *WebPage::mainFrame()
@@ -1192,6 +1287,7 @@ void WebPage::initCompletions()
     addCompletion("onLoadFinished");
     addCompletion("onResourceRequested");
     addCompletion("onResourceReceived");
+    addCompletion("onUnsupportedContentReceived");
     addCompletion("onUrlChanged");
     addCompletion("onNavigationRequested");
     addCompletion("onError");

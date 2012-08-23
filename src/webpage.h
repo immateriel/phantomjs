@@ -113,6 +113,9 @@ public:
     void setZoomFactor(qreal zoom);
     qreal zoomFactor() const;
 
+    int getInternalIdFromReply(QNetworkReply *reply);
+    void emitUnsupportedContentReceived(QVariantMap data);
+
     /**
      * Value of <code>"window.name"</code> within the main page frame.
      *
@@ -204,6 +207,7 @@ public slots:
     QObject *_getJsPromptCallback();
     void uploadFile(const QString &selector, const QString &fileName);
     void sendEvent(const QString &type, const QVariant &arg1 = QVariant(), const QVariant &arg2 = QVariant());
+    void saveUnsupportedContent(const QString &fileName, const QVariant &arg1);
 
     /**
      * Returns a Child Page that matches the given <code>"window.name"</code>.
@@ -304,6 +308,7 @@ signals:
     void javaScriptErrorSent(const QString &msg, const QString &stack);
     void resourceRequested(const QVariant &req);
     void resourceReceived(const QVariant &resource);
+    void unsupportedContentReceived(const QVariant &resource);
     void urlChanged(const QUrl &url);
     void navigationRequested(const QUrl &url, const QString &navigationType, bool navigationLocked, bool isMainFrame);
     void rawPageCreated(QObject *page);
@@ -311,6 +316,7 @@ signals:
 private slots:
     void finish(bool ok);
     void handleJavaScriptWindowObjectCleared();
+    void handleUnsupportedContent(QNetworkReply *reply);
 
 private:
     QImage renderImage();
@@ -334,6 +340,9 @@ private:
     QWebInspector* m_inspector;
     WebpageCallbacks *m_callbacks;
     bool m_navigationLocked;
+    QHash<QNetworkReply*, int> m_uc_ids;
+    QHash<int, QNetworkReply*> m_uc_replies;
+    int m_uc_idCounter;
     QPoint m_mousePos;
 
     friend class Phantom;
