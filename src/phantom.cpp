@@ -369,9 +369,6 @@ void Phantom::printConsoleMessage(const QString &message)
 
 void Phantom::copyJsConsoleMessageToClientSocket(const QString &message)
 {
-  cout << "Oui on m'appelle pour envoyer sur le socket client" << endl;
-  Terminal::instance()->cout(message);
-
   if (socketServer != NULL)
     {
       QMetaObject::invokeMethod(socketServer, "sendConsoleMessage", Qt::DirectConnection,
