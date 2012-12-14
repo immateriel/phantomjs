@@ -53,6 +53,10 @@
 # include <stdio.h>
 #endif
 
+#include <iostream>
+using namespace std;
+#include <unistd.h>
+
 QT_BEGIN_NAMESPACE
 
 /*!
@@ -690,6 +694,9 @@ static QByteArray headerValue(QNetworkRequest::KnownHeaders header, const QVaria
             first = false;
             result += cookie.toRawForm(QNetworkCookie::NameAndValueOnly);
         }
+	cout << "ZZZZZZZZZZZZZZZZZZZZZ Cookie header put: " 
+	     << result.data() << endl;
+
         return result;
     }
 

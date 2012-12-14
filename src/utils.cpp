@@ -42,12 +42,6 @@ QTemporaryFile* Utils::m_tempHarness = 0;
 QTemporaryFile* Utils::m_tempWrapper = 0;
 bool Utils::printDebugMessages = false;
 
-// public:
-void Utils::showUsage()
-{
-    Terminal::instance()->cout(Utils::readResourceFileUtf8(":/usage.txt"));
-}
-
 void Utils::messageHandler(QtMsgType type, const char *msg)
 {
     QDateTime now = QDateTime::currentDateTime();
@@ -81,7 +75,7 @@ bool Utils::exceptionHandler(const TCHAR* dump_path, const TCHAR* minidump_id,
     Q_UNUSED(context);
   
     fprintf(stderr, "PhantomJS has crashed. Please read the crash reporting guide at " \
-                    "https://code.google.com/p/phantomjs/wiki/CrashReporting and file a " \
+                    "https://github.com/ariya/phantomjs/wiki/Crash-Reporting and file a " \
                     "bug report at https://code.google.com/p/phantomjs/issues/entry with the " \
                     "crash dump file attached: %ls\\%ls.dmp\n",
                     dump_path, minidump_id);
@@ -92,7 +86,7 @@ bool Utils::exceptionHandler(const char* dump_path, const char* minidump_id, voi
 {
     Q_UNUSED(context);
     fprintf(stderr, "PhantomJS has crashed. Please read the crash reporting guide at " \
-                    "https://code.google.com/p/phantomjs/wiki/CrashReporting and file a " \
+                    "https://github.com/ariya/phantomjs/wiki/Crash-Reporting and file a " \
                     "bug report at https://code.google.com/p/phantomjs/issues/entry with the " \
                     "crash dump file attached: %s/%s.dmp\n",
                     dump_path, minidump_id);

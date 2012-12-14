@@ -34,8 +34,6 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QFile>
-// note: QMetaObject apparently does not define QMetaEnum...
-#include <qmetaobject.h>
 #include <QWebPage>
 #include <QThread>
 
@@ -56,6 +54,7 @@ using namespace std;
 #include "repl.h"
 #include "system.h"
 #include "callback.h"
+#include "cookiejar.h"
 
 #include "socketserver.h"
 
@@ -69,30 +68,24 @@ Phantom::Phantom(QObject *parent)
     , m_filesystem(0)
     , m_system(0)
 {
-    // Skip the first argument, i.e. the application executable (phantomjs).
     QStringList args = QApplication::arguments();
-    args.removeFirst();
 
     // Prepare the configuration object based on the command line arguments.
     // Because this object will be used by other classes, it needs to be ready ASAP.
     m_config.init(&args);
-
-    // initialize key map
-    QMetaEnum keys = staticQtMetaObject.enumerator( staticQtMetaObject.indexOfEnumerator("Key") );
-    for(int i = 0; i < keys.keyCount(); ++i) {
-        QString name = keys.key(i);
-        if (name.startsWith("Key_")) {
-            name.remove(0, 4);
-        }
-        m_keyMap[name] = keys.value(i);
-    }
+    // Apply debug configuration as early as possible
+    Utils::printDebugMessages = m_config.printDebugMessages();
 }
 
 void Phantom::init()
 {
     if (m_config.helpFlag()) {
+        Terminal::instance()->cout(QString("%1").arg(m_config.helpText()));
+        Terminal::instance()->cout("Without any argument, PhantomJS will launch in interactive mode (REPL).");
+        Terminal::instance()->cout("");
+        Terminal::instance()->cout("Documentation can be found at the web site, http://phantomjs.org.");
+        Terminal::instance()->cout("");
         m_terminated = true;
-        Utils::showUsage();
         return;
     }
 
@@ -108,25 +101,30 @@ void Phantom::init()
         return;
     }
 
+    // Initialize the CookieJar
+    CookieJar::instance(m_config.cookiesFile());
+
     m_page = new WebPage(this, QUrl::fromLocalFile(m_config.scriptFile()));
     m_pages.append(m_page);
 
-    if (m_config.proxyHost().isEmpty()) {
-        QNetworkProxyFactory::setUseSystemConfiguration(true);
-    } else {
-        QString proxyType = m_config.proxyType();
-        QNetworkProxy::ProxyType networkProxyType = QNetworkProxy::HttpProxy;
-
-        if (proxyType == "socks5") {
-            networkProxyType = QNetworkProxy::Socks5Proxy;
-        }
-
-        if(!m_config.proxyAuthUser().isEmpty() && !m_config.proxyAuthPass().isEmpty()) {
-            QNetworkProxy proxy(networkProxyType, m_config.proxyHost(), m_config.proxyPort(), m_config.proxyAuthUser(), m_config.proxyAuthPass());
-            QNetworkProxy::setApplicationProxy(proxy);
+    QString proxyType = m_config.proxyType();
+    if (proxyType != "none") {
+        if (m_config.proxyHost().isEmpty()) {
+            QNetworkProxyFactory::setUseSystemConfiguration(true);
         } else {
-            QNetworkProxy proxy(networkProxyType, m_config.proxyHost(), m_config.proxyPort());
-            QNetworkProxy::setApplicationProxy(proxy);
+            QNetworkProxy::ProxyType networkProxyType = QNetworkProxy::HttpProxy;
+
+            if (proxyType == "socks5") {
+                networkProxyType = QNetworkProxy::Socks5Proxy;
+            }
+
+            if(!m_config.proxyAuthUser().isEmpty() && !m_config.proxyAuthPass().isEmpty()) {
+                QNetworkProxy proxy(networkProxyType, m_config.proxyHost(), m_config.proxyPort(), m_config.proxyAuthUser(), m_config.proxyAuthPass());
+                QNetworkProxy::setApplicationProxy(proxy);
+            } else {
+                QNetworkProxy proxy(networkProxyType, m_config.proxyHost(), m_config.proxyPort());
+                QNetworkProxy::setApplicationProxy(proxy);
+            }
         }
     }
 
@@ -277,6 +275,20 @@ bool Phantom::printDebugMessages() const
     return m_config.printDebugMessages();
 }
 
+bool Phantom::areCookiesEnabled() const
+{
+    return CookieJar::instance()->isEnabled();
+}
+
+void Phantom::setCookiesEnabled(const bool value)
+{
+    if (value) {
+        CookieJar::instance()->enable();
+    } else {
+        CookieJar::instance()->disable();
+    }
+}
+
 // public slots:
 QObject *Phantom::createWebPage()
 {
@@ -331,6 +343,9 @@ QObject* Phantom::createCallback()
 
 void Phantom::loadModule(const QString &moduleSource, const QString &filename)
 {
+    if (m_terminated)
+        return;
+
    QString scriptSource =
       "(function(require, exports, module) {" +
       moduleSource +
@@ -344,6 +359,9 @@ void Phantom::loadModule(const QString &moduleSource, const QString &filename)
 
 bool Phantom::injectJs(const QString &jsFilePath)
 {
+    if (m_terminated)
+        return false;
+
     return Utils::injectJsInFrame(jsFilePath, libraryPath(), m_page->mainFrame());
 }
 
@@ -388,6 +406,39 @@ void Phantom::onInitialized()
                 );
 }
 
+bool Phantom::setCookies(const QVariantList &cookies)
+{
+    // Delete all the cookies from the CookieJar
+    CookieJar::instance()->clearCookies();
+    // Add a new set of cookies
+    return CookieJar::instance()->addCookiesFromMap(cookies);
+}
+
+QVariantList Phantom::cookies() const
+{
+    // Return all the Cookies in the CookieJar, as a list of Maps (aka JSON in JS space)
+    return CookieJar::instance()->cookiesToMap();
+}
+
+bool Phantom::addCookie(const QVariantMap &cookie)
+{
+    return CookieJar::instance()->addCookieFromMap(cookie);
+}
+
+bool Phantom::deleteCookie(const QString &cookieName)
+{
+    if (!cookieName.isEmpty()) {
+        return CookieJar::instance()->deleteCookie(cookieName);
+    }
+    return false;
+}
+
+void Phantom::clearCookies()
+{
+    CookieJar::instance()->clearCookies();
+}
+
+
 // private:
 void Phantom::doExit(int code)
 {
@@ -415,12 +466,13 @@ void Phantom::initCompletions()
     addCompletion("outputEncoding");
     addCompletion("scriptName");
     addCompletion("version");
+    addCompletion("cookiesEnabled");
+    addCompletion("cookies");
     // functions
     addCompletion("exit");
+    addCompletion("debugExit");
     addCompletion("injectJs");
-}
-
-QVariantMap Phantom::keys() const
-{
-    return m_keyMap;
+    addCompletion("addCookie");
+    addCompletion("deleteCookie");
+    addCompletion("clearCookies");
 }

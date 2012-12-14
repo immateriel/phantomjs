@@ -47,7 +47,7 @@ SOURCES += phantom.cpp \
     repl.cpp \
     replcompletable.cpp
 
-OTHER_FILES += usage.txt \
+OTHER_FILES += \
     bootstrap.js \
     configurator.js \
     modules/fs.js \
@@ -58,6 +58,7 @@ OTHER_FILES += usage.txt \
 include(gif/gif.pri)
 include(mongoose/mongoose.pri)
 include(linenoise/linenoise.pri)
+include(qcommandline/qcommandline.pri)
 
 linux*|mac {
     INCLUDEPATH += breakpad/src
@@ -120,6 +121,7 @@ win32-msvc* {
             qcncodecs \
             qjpcodecs \
             qkrcodecs \
-            qtwcodecs
+            qtwcodecs \
+            qico
     }
 }
