@@ -7,8 +7,15 @@
 #include <QTcpSocket>
 #include <QObject>
 #include <QAbstractSocket>
+#include <QWebPage>
+#include <QThread>
 using namespace std;
 #include <unistd.h>
+
+#include "socketclient.h"
+#include "phantom.h"
+#include "webpage.h"
+#include "main.h"
 
 /*
 Protocol:
@@ -20,7 +27,7 @@ needs to be executed.
 - Then the javascript string code.
  */
 
-SocketServer::SocketServer()
+SocketServer::SocketServer(QObject *parent)
 {
 }
 
@@ -28,38 +35,35 @@ SocketServer::~SocketServer()
 {
 }
 
-void SocketServer::setup(QWebFrame *webframe)
+void SocketServer::setup(Main *main)
 {
-  this->webframe = webframe;
-  
-  connect(this, SIGNAL(evaluateJavaScript(const QString &code)),
-	  webframe, SLOT(QVariant& evaluateJavaScript(const QString &code)),
-	  Qt::QueuedConnection);
+  cout << "WARNING: SocketServer setup" << endl;
 
   QTextCodec::setCodecForCStrings(QTextCodec::codecForName("UTF8"));
+
+  //  QMetaObject::invokeMethod(main, "create_new_phantomjs", Qt::DirectConnection);
+  this->main = main;
 }
 
 void SocketServer::sendConsoleMessage(const QString &message)
 {
-  cout << "Allez on l'envoit au client ce message" << endl;
-  cout << "message: '" << message.toUtf8().data() << "'" << endl;
-  if (client_socket != NULL)
-    {
-      client_socket->write(message.toUtf8().data());
-      client_socket->write("\n");
-      //      client_socket->flush();
-    }
+  cout << "WARNING: outdated sendConsoleMessage" << endl;
+  cout << "WARNING: Allez on l'envoit au client ce message" << endl;
+  cout << "WARNING: message: '" << message.toUtf8().data() << "'" << endl;
 }
 
 void SocketServer::client_disconnected()
 {
+  cout << "WARNING: outdated client_disconnected" << endl;
+#if 0
   cout << "Le client il est parti" << endl;
   client_socket = NULL;
+#endif
 }
 
 void SocketServer::doWork()
 {
-  cout << "doWork..." << endl;
+  cout << "SocketServer doWork..." << endl;
 
   QTcpServer server;
   bool status = server.listen(QHostAddress::Any, 12000);
@@ -83,173 +87,25 @@ void SocketServer::doWork()
 	    }
 	  else
 	    {
-	      /* Read all data till all the input is read */
-	      QByteArray request_data;
-	      qint64 max_nb_bytes_by_read = 80;
-	      char buf[max_nb_bytes_by_read+1];
-	      // testServer.client_read_channel_closed = false;
-	      // QObject::connect(client_socket, SIGNAL(readChannelFinished(void)),
-	      // 		     &testServer, SLOT(client_read_channel_close(void)));
+	      QThread *thread = new QThread();
+	      thread->start();
 
-	      QObject::connect(client_socket, SIGNAL(disconnected(void)),
-			       this, SLOT(client_disconnected(void)));
+	      cout << "...1" << endl;
+	      SocketClient *socketClient = new SocketClient();
+	      socketClient->moveToThread(thread);
 
-	      /* While connected, wait for new request */
-	      while (client_socket != NULL)
-		{
-		  cout << "waiting for a new request of the client" << endl;
+	      cout << "...2" << endl;
+	      socketClient->client_socket = client_socket;
+	      cout << "...3" << endl;
+	      //	      Phantom *phantom = new Phantom();
+	      //	      phantom->init();
 
-	      /* First read the header which consists in a line of text 
-		 telling how long in bytes is the request */
-	      while (true)
-		{
-		  cout << "data read..." << endl;
-		  qint64 status_read = client_socket->read(buf, max_nb_bytes_by_read);
-		  if (status_read == 0)
-		    {
-		      cout << "buf 0" << endl; 
-		    }
-		  else if (status_read == -1)
-		    {
-		      cout << "error" << endl;
-		    }
-		  else
-		    {
-		      request_data.append(buf, status_read);
-		    }
-
-		
-		  cout << "waiting" << endl;
-
-		  /* Once the newline character is read, the header has
-		     been completely read. */
-		  if (request_data.indexOf("\n") != -1)
-		    {
-		      cout << "endline character found" << endl;
-		      break;
-		    }
-
-		  cout << "waiting2" << endl;
-
-		  // if (status_read == 0 && !client_socket->waitForReadyRead())
-		  //   break;
-
-		  if (!client_socket->waitForReadyRead())
-		    {
-		      cout << "!client_socket->waitForReadyRead())" << endl;
-		      break;
-		    }
-		  cout << "waiting3" << endl;
-
-		}
-	      cout << "Header end met" << endl;
-
-	      if (client_socket == NULL)
-		{
-		  cout << "Socket null" << endl;
-		  break;
-		}
-
-	      int index_newline;
-	      QByteArray header_data;
-	      int request_length = 0;
-	      if ((index_newline = request_data.indexOf("\n")) != -1)
-		{
-		  header_data = request_data.left(index_newline + 1);
-		  cout << "Header read: «" << header_data.data() << "» " << endl;
-		  request_data  = request_data.right(request_data.size() - (index_newline + 1));
-		  request_length = atoi(header_data.data());
-		  cout << "Length of the request in bytes:"
-		       <<  request_length << endl;
-		  cout << "Rest of the request: «" << request_data.data() << "» " << endl;
-		}
-	      else
-		{
-		  cerr << "Error, no header found" << endl;
-		  exit(1);
-		}
-	    
-	      /* Read the request */
-	      while (request_data.size() < request_length)
-		{
-		  qint64 status_read = client_socket->read(buf, max_nb_bytes_by_read);
-		  if (status_read == 0)
-		    {
-		      cout << "buf 0" << endl; 
-		    }
-		  else if (status_read == -1)
-		    {
-		      cout << "error" << endl;
-		    }
-		  else
-		    {
-		      request_data.append(buf, status_read);
-		    }
-
-		  if (status_read == 0 && !client_socket->waitForReadyRead())
-		    break;
-		}
-	      cout << "OK whole request read, it is:«" << request_data.data () << "» " << endl;
-
-	      // Evaluating the request
-
-	      // Should have the same behaviour than on console, wait for the end of the evaluation before going on...
-
-	      // cout << "emitting..." << endl;
-	      // emit( evaluateJavaScript(QString(request_data.data())) );
-
-	      cout << "et en invokant? " << endl;
-	      //	      QMetaObject::invokeMethod(webframe, "evaluateJavaScript", Qt::QueuedConnection, Q_ARG(QString, QString("console.log('lala c est la bonne maniere ');")) );
-	      QMetaObject::invokeMethod(webframe, "evaluateJavaScript", Qt::QueuedConnection, Q_ARG(QString, QString(request_data.data())) );
-
-	      request_data.clear();
-	      request_length = 0;
-
-	      cout << "JS evaluated" << endl;
-
-	      // bool statusError = injectJsInFrame(const QString &jsFilePath, const QString &libraryPath, web, const bool startingScript = false);
-
-	      // webframe->evaluateJavaScript(request_data.data(), QDir::currentPath());
-
-	      //            m_page->evaluateJavaScript(request_data.data());
-
-
-	      // Le problème c'est sans doute qu'il faut attendre que la page soit chargée...
-
-	      // for (int i = 0; i < 10; i++)
-	      //   {
-	      // 	usleep(1000 * 1000);
-	      //   }
-	    
-
-	      // QString(JS_EVAL_USER_INPUT).arg(
-	      //     QString(userInput).replace('"', "\\\"")), QString("phantomjs://repl-input"));
-
-
-	      // // buf = client_socket->readAll();
-	      // // request_data.append(buf);
-	      // QString s = QString::fromUtf8(request_data.data());
-	      // cout << "Request read:" << endl << (char*)s.toUtf8().data() << endl;
-	    
-	      // QString response("Hé ! Les loyers sont trop chers !\n");
-	      // // TODO: check that all the bytes have been written...
-	      // qint64 nb_written = client_socket->write(response.toUtf8().data());
-	      // cout << "bytes written: " << nb_written << endl;
-	      // if (nb_written == -1)
-	      //   {
-	      // 	string str;
-	      // 	str = qPrintable( client_socket->errorString() );
-	      // 	cout << "error and error is: " << str << endl;
-	      //   }
-	      
-		}
-
-	      cout << "Fini avec ce client" << endl;
-#if 0
-	      client_socket->flush();
-	      client_socket->close();
-	      client_socket = NULL;
-#endif
+	      //	      socketClient->setup(main->create_new_phantomjs());
+	      socketClient->setup(main);
+	      cout << "...4" << endl;
+	      QMetaObject::invokeMethod(socketClient, "doWork", Qt::QueuedConnection);
+	      cout << "...5" << endl;
+	      cout << "client pris en charge" << endl;
 
 	    }
 	}

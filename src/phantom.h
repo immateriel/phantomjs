@@ -45,6 +45,7 @@ class WebPage;
 class CustomPage;
 class WebServer;
 class SocketServer;
+class SocketClient;
 
 class Phantom: public REPLCompletable
 {
@@ -60,11 +61,13 @@ class Phantom: public REPLCompletable
     Q_PROPERTY(QVariantList cookies READ cookies WRITE setCookies)
 
 private:
+
+public:
     // Private constructor: the Phantom class is a singleton
+    // Public constructor : the Phantom class is no longer a singleton
     Phantom(QObject *parent = 0);
     void init();
 
-public:
     static Phantom *instance();
     virtual ~Phantom();
 
@@ -178,7 +181,6 @@ private:
     virtual void initCompletions();
 
     Encoding m_scriptFileEnc;
-    WebPage *m_page;
     bool m_terminated;
     int m_returnValue;
     QString m_script;
@@ -191,6 +193,11 @@ private:
     QVariantMap m_keyMap;
     SocketServer *socketServer;
     friend class CustomPage;
+
+public:
+    WebPage *m_page;
+    SocketClient *socketClient;
+
 };
 
 #endif // PHANTOM_H

@@ -31,6 +31,12 @@
 #include "utils.h"
 #include "env.h"
 #include "phantom.h"
+#include "main.h"
+
+#include <iostream>
+using namespace std;
+
+#include "socketserver.h"
 
 #ifdef Q_OS_LINUX
 #include "client/linux/handler/exception_handler.h"
@@ -40,6 +46,7 @@
 #endif
 
 #include <QApplication>
+#include <QThread>
 
 #ifdef Q_OS_WIN32
 using namespace google_breakpad;
@@ -58,6 +65,60 @@ Q_IMPORT_PLUGIN(qico)
 #if QT_VERSION != QT_VERSION_CHECK(4, 8, 2)
 #error Something is wrong with the setup. Please report to the mailing list!
 #endif
+
+static Main *mainInstance = NULL;
+
+Main::Main(QObject *parent)
+{
+}
+
+Main::~Main()
+{
+}
+
+Main *Main::instance()
+{
+  if (NULL == mainInstance) 
+    {
+      mainInstance = new Main();
+    }
+  return mainInstance;
+}
+
+Phantom *Main::create_new_phantomjs()
+{
+  cout << "MAIN: create_new_phantomjs()" << endl;
+  Phantom *phantom = new Phantom();
+  phantom->init();
+  return phantom;
+}
+
+void Main::createPhantomJSInstance(quint64 threadId)
+{
+  cout << "MAIN: createPhantomJSInstance() for threadId" << threadId << endl;
+  Phantom *phantom = new Phantom();
+  phantom->init();
+  //  this->phantom = phantom;
+  phantomInstancesMap[threadId] = phantom;
+}
+
+void Main::deletePhantomJSInstance(quint64 threadId)
+{
+  cout << "MAIN: deletePhantomJSInstance() for threadId" << threadId << endl;
+  Phantom *phantom = phantomInstancesMap[threadId];
+  phantomInstancesMap.remove(threadId);
+  cout << "Instance: " << (void*) phantom << endl;
+  delete phantom;
+}
+
+int Main::createPhantomJSInstance2()
+{
+  cout << "MAIN: createPhantomJSInstance2()" << endl;
+  Phantom *phantom = new Phantom();
+  phantom->init();
+  //  return phantom;
+  return 15;
+}
 
 int main(int argc, char** argv, const char** envp)
 {
@@ -102,6 +163,8 @@ int main(int argc, char** argv, const char** envp)
     // Registering an alternative Message Handler
     qInstallMsgHandler(Utils::messageHandler);
 
+    //    Phantom *phantom = Phantom::instance();
+#if 0
     // Get the Phantom singleton
     Phantom *phantom = Phantom::instance();
 
@@ -114,4 +177,22 @@ int main(int argc, char** argv, const char** envp)
     int retVal = phantom->returnValue();
     delete phantom;
     return retVal;
+#endif
+
+    Main *main = Main::instance();
+    //    main->moveToThread(app.thread());
+    cout << "AAAAAAA main pointer:" << (void*)main << endl;
+    cout << "AAAAAAA main thread pointer:" << (void*)main->thread() << endl;
+    //    Phantom *phantom = main->create_new_phantomjs();
+    SocketServer *socketServer = new SocketServer(main);
+    QThread *thread = new QThread();
+    socketServer->moveToThread(thread);
+    socketServer->setup(main);
+    thread->start();
+    QMetaObject::invokeMethod(socketServer, "doWork", Qt::QueuedConnection);
+    cout << "ici aussi" << endl;
+
+    app.exec();
+
+    return 0;
 }

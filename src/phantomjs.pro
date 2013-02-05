@@ -15,6 +15,7 @@ HEADERS += csconverter.h \
     webpage.h \
     webserver.h \
     socketserver.h \
+    socketclient.h \
     consts.h \
     utils.h \
     networkaccessmanager.h \
@@ -22,6 +23,7 @@ HEADERS += csconverter.h \
     filesystem.h \
     system.h \
     env.h \
+    main.h \
     terminal.h \
     encoding.h \
     config.h \
@@ -33,6 +35,7 @@ SOURCES += phantom.cpp \
     webpage.cpp \
     webserver.cpp \
     socketserver.cpp \
+    socketclient.cpp \
     main.cpp \
     csconverter.cpp \
     utils.cpp \

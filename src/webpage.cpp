@@ -69,6 +69,9 @@
 #define INPAGE_CALL_NAME                "window.callPhantom"
 #define CALLBACKS_OBJECT_INJECTION      INPAGE_CALL_NAME" = function() { return window."CALLBACKS_OBJECT_NAME".call.call(_phantom, Array.prototype.splice.call(arguments, 0)); };"
 
+#include <iostream>
+using namespace std;
+
 
 /**
   * @class CustomPage
@@ -132,6 +135,7 @@ protected:
     void javaScriptConsoleMessage(const QString &message, int lineNumber, const QString &sourceID) {
         Q_UNUSED(lineNumber);
         Q_UNUSED(sourceID);
+	cout << "WebPage::javascriptConsoleMessage called" << endl;	
         emit m_webPage->javaScriptConsoleMessageSent(message);
     }
 
@@ -422,6 +426,7 @@ void WebPage::saveUnsupportedContent(const QString &fileName, const QVariant &ar
   outFile.close();
 
   m_uc_replies.remove(id);
+}
 
 WebPage::~WebPage()
 {
@@ -610,6 +615,7 @@ QVariantMap WebPage::paperSize() const
 
 QVariant WebPage::evaluateJavaScript(const QString &code)
 {
+  cout << "WebPage::evaluateJavaScript called: ««" << code.toUtf8().data() << "»»" << endl;
     QString function = "(" + code + ")()";
     return m_currentFrame->evaluateJavaScript(
                 function,

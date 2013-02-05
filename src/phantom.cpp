@@ -57,6 +57,7 @@ using namespace std;
 #include "cookiejar.h"
 
 #include "socketserver.h"
+#include "socketclient.h"
 
 static Phantom *phantomInstance = NULL;
 
@@ -75,6 +76,8 @@ Phantom::Phantom(QObject *parent)
     m_config.init(&args);
     // Apply debug configuration as early as possible
     Utils::printDebugMessages = m_config.printDebugMessages();
+    // TODO: take that off
+    Utils::printDebugMessages = true;
 }
 
 void Phantom::init()
@@ -153,6 +156,7 @@ void Phantom::init()
 
     setLibraryPath(QFileInfo(m_config.scriptFile()).dir().absolutePath());
 
+    cout << "Phanthom init done" << endl;
     this->socketServer = NULL;
 }
 
@@ -196,7 +200,7 @@ bool Phantom::execute()
         return false;
 
     if (m_config.scriptFile().isEmpty()) {
-#if 1
+#if 0
       cout << "Coucou" << endl;
 
       QThread *thread = new QThread();
@@ -387,15 +391,18 @@ void Phantom::printConsoleMessage(const QString &message)
 
 void Phantom::copyJsConsoleMessageToClientSocket(const QString &message)
 {
-  if (socketServer != NULL)
+  cout << "Phantom::copyJsConsoleMessageToClientSocket invocated..." << endl;
+
+  if (socketClient != NULL)
     {
-      QMetaObject::invokeMethod(socketServer, "sendConsoleMessage", Qt::DirectConnection,
+      QMetaObject::invokeMethod(socketClient, "sendConsoleMessage", Qt::DirectConnection,
 				Q_ARG(QString, message));
     }	
 }
 
 void Phantom::onInitialized()
 {
+    cout << "Phantom onInitialized called" << endl;
     // Add 'phantom' object to the global scope
     m_page->mainFrame()->addToJavaScriptWindowObject("phantom", this);
 
@@ -404,6 +411,7 @@ void Phantom::onInitialized()
                 Utils::readResourceFileUtf8(":/bootstrap.js"),
                 QString("phantomjs://bootstrap.js")
                 );
+    cout << "Phantom onInitialized finished" << endl;
 }
 
 bool Phantom::setCookies(const QVariantList &cookies)
