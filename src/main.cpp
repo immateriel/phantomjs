@@ -87,7 +87,7 @@ Main *Main::instance()
 
 Phantom *Main::create_new_phantomjs()
 {
-  cout << "MAIN: create_new_phantomjs()" << endl;
+  cout << "CCCCCC MAIN: create_new_phantomjs()" << endl;
   Phantom *phantom = new Phantom();
   phantom->init();
   return phantom;
@@ -95,7 +95,7 @@ Phantom *Main::create_new_phantomjs()
 
 void Main::createPhantomJSInstance(quint64 threadId)
 {
-  cout << "MAIN: createPhantomJSInstance() for threadId" << threadId << endl;
+  cout << "CCCCCC MAIN: createPhantomJSInstance() for threadId" << threadId << endl;
   Phantom *phantom = new Phantom();
   phantom->init();
   //  this->phantom = phantom;
@@ -104,16 +104,16 @@ void Main::createPhantomJSInstance(quint64 threadId)
 
 void Main::deletePhantomJSInstance(quint64 threadId)
 {
-  cout << "MAIN: deletePhantomJSInstance() for threadId" << threadId << endl;
+  cout << "CCCCCC MAIN: deletePhantomJSInstance() for threadId" << threadId << endl;
   Phantom *phantom = phantomInstancesMap[threadId];
   phantomInstancesMap.remove(threadId);
-  cout << "Instance: " << (void*) phantom << endl;
+  cout << "CCCCCC  Instance: " << (void*) phantom << endl;
   delete phantom;
 }
 
 int Main::createPhantomJSInstance2()
 {
-  cout << "MAIN: createPhantomJSInstance2()" << endl;
+  cout << "CCCCCC MAIN: createPhantomJSInstance2()" << endl;
   Phantom *phantom = new Phantom();
   phantom->init();
   //  return phantom;

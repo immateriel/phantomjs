@@ -34,7 +34,7 @@ void SocketClient::setup(Main *main)
   cout << "AAAAAAA main pointer:" << (void*)main << endl;
   cout << "AAAAAAA main thread pointer:" << (void*)main->thread() << endl;
 
-  quint64 thread_id = (quint64) this->thread()->currentThreadId();
+  quint64 thread_id = (quint64) (void*)this;
   cout << "BBBBBB thread_id:" << thread_id << endl;
   //  this->phantom = phantom;
   //  this->phantom = main->create_new_phantomjs();
@@ -42,13 +42,13 @@ void SocketClient::setup(Main *main)
 
   QMetaObject::invokeMethod(main, "createPhantomJSInstance", Qt::QueuedConnection, Q_ARG(quint64, thread_id));
 
-  cout << "CCCC" << endl;
+  cout << "CCCCCC 1" << endl;
   int tmp;
   //QMetaObject::invokeMethod(main, "createPhantomJSInstance2", Qt::QueuedConnection, Q_RETURN_ARG(int, tmp));
-  cout << "CCCC2" << endl;
+  cout << "CCCCCC 2" << endl;
   
   while (!main->phantomInstancesMap.contains(thread_id)){
-    cout << "CCCC3" << endl;
+    cout << "CCCCCC 3" << endl;
     sleep(1);
   }
 #if 0
@@ -108,7 +108,7 @@ void SocketClient::copyJsConsoleMessageToClientSocket(const QString &message)
 
 void SocketClient::client_disconnected()
 {
-  cout << "Le client il est parti" << endl;
+  cout << "CCCCCC Le client il est parti" << endl;
   if (client_socket != NULL)
     {
       client_socket->close();
@@ -184,7 +184,7 @@ void SocketClient::doWork()
 
       if (client_socket == NULL)
 	{
-	  cout << "Socket null" << endl;
+	  cout << "CCCCCC Socket null" << endl;
 	  client_disconnected();
 	  break;
 	}
@@ -204,7 +204,7 @@ void SocketClient::doWork()
 	}
       else
 	{
-	  cerr << "Error, no header found" << endl;
+	  cerr << "CCCCCC Error, no header found" << endl;
 	  client_disconnected();
 	  return;
 	}
