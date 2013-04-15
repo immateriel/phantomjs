@@ -290,6 +290,7 @@ void SocketClient::doWork()
     }
 
   cout << "Fini avec ce client" << endl;
+  client_disconnected();
 #if 0
   client_socket->flush();
   client_socket->close();
