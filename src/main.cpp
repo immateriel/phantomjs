@@ -102,12 +102,21 @@ void Main::createPhantomJSInstance(quint64 threadId)
   phantomInstancesMap[threadId] = phantom;
 }
 
+void Main::addThreadInstance(quint64 threadId, QThread *thread)
+{
+  cout << "LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL MAIN addThreadInstance threadId: " << threadId << endl;
+  threadInstancesMap[threadId] = thread;
+}
+
 void Main::deletePhantomJSInstance(quint64 threadId)
 {
   cout << "CCCCCC MAIN: deletePhantomJSInstance() for threadId" << threadId << endl;
   Phantom *phantom = phantomInstancesMap[threadId];
+  // QThread *thread = threadInstancesMap[threadId];
   phantomInstancesMap.remove(threadId);
+  // threadInstancesMap.remove(threadId);
   cout << "CCCCCC  Instance: " << (void*) phantom << endl;
+  // thread->quit();
   delete phantom;
 }
 

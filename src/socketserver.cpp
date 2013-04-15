@@ -9,6 +9,7 @@
 #include <QAbstractSocket>
 #include <QWebPage>
 #include <QThread>
+#include <QTimer>
 using namespace std;
 #include <unistd.h>
 
@@ -88,10 +89,22 @@ void SocketServer::doWork()
 	  else
 	    {
 	      QThread *thread = new QThread();
+
+#if 0
+	      QTimer::singleShot(2000, thread, SLOT(quit()));
+	      connect(thread, SIGNAL(terminated()), thread, SLOT(quit()));
+	      connect(thread, SIGNAL(terminated()), thread, SLOT(deleteLater()));
+#endif
+
 	      thread->start();
 
 	      cout << "...1" << endl;
-	      SocketClient *socketClient = new SocketClient();
+	      //	      QThread *thread = NULL;
+	      SocketClient *socketClient = new SocketClient(thread);
+
+	      quint64 thread_id = (quint64) (void*)socketClient;
+	      threadInstancesMap[thread_id] = thread;
+
 	      socketClient->moveToThread(thread);
 
 	      cout << "...2" << endl;
@@ -101,9 +114,15 @@ void SocketServer::doWork()
 	      //	      phantom->init();
 
 	      //	      socketClient->setup(main->create_new_phantomjs());
-	      socketClient->setup(main);
+	      socketClient->setup(main, this);
 	      cout << "...4" << endl;
 	      QMetaObject::invokeMethod(socketClient, "doWork", Qt::QueuedConnection);
+
+	      //	      socketClient->client_disconnected();
+
+	      //	      thread->quit();
+
+
 	      cout << "...5" << endl;
 	      cout << "client pris en charge" << endl;
 
@@ -115,4 +134,12 @@ void SocketServer::doWork()
 	}
 
     }
+}
+
+void SocketServer::deleteThreadInstance(quint64 threadId)
+{
+  cout << "UUUUUUUUUUUU SocketServer: deleteThreadInstance() for threadId" << threadId << endl;
+  QThread *thread = threadInstancesMap[threadId];
+  threadInstancesMap.remove(threadId);
+  thread->quit();
 }

@@ -5,6 +5,7 @@
 #include <QTcpServer>
 #include <QThread>
 #include <QTextCodec>
+#include <QTimer>
 #include <QTcpSocket>
 #include <QObject>
 #include <QAbstractSocket>
@@ -17,17 +18,20 @@ using namespace std;
 /*
  */
 
-SocketClient::SocketClient()
+SocketClient::SocketClient(QThread *thread)
 {
+  this->thread = thread;
 }
 
 SocketClient::~SocketClient()
 {
 }
 
-void SocketClient::setup(Main *main)
+void SocketClient::setup(Main *main, SocketServer *socketServer)
 {
   this->main = main;
+  this->socketServer = socketServer;
+
   cout << "...2" << endl;
   cout << "...3" << endl;
   //	      phantom->execute();
@@ -113,7 +117,21 @@ void SocketClient::client_disconnected()
     {
       client_socket->close();
     }
+
+
   QMetaObject::invokeMethod(main, "deletePhantomJSInstance", Qt::QueuedConnection, Q_ARG(quint64, threadId));
+
+  //  QMetaObject::invokeMethod(socketServer, "deleteThreadInstance", Qt::QueuedConnection, Q_ARG(quint64, threadId));
+  socketServer->deleteThreadInstance(threadId);
+
+  // QMetaObject::invokeMethod(thread, "quit");
+  // QMetaObject::invokeMethod(thread, "terminate");
+
+  // thread->quit();
+  // thread->terminate();
+
+  // if (thread != NULL)
+  //   delete thread;
 }
 
 void SocketClient::doWork()

@@ -23,6 +23,7 @@ public slots:
   void doWork();
   void client_disconnected();
   void sendConsoleMessage(const QString &message);
+  void deleteThreadInstance(quint64 threadId);
 
 signals:
   void evaluateJavaScript(const QString &code);
@@ -32,6 +33,7 @@ private:
   Main *main;
   QTcpSocket *client_socket;
   QWebFrame *webframe;
+  QMap <quint64, QThread*> threadInstancesMap;
 
 };
  

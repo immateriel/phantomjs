@@ -17,9 +17,11 @@ public:
   Phantom *create_new_phantomjs();
   Phantom *phantom;
   QMap <quint64, Phantom*> phantomInstancesMap;
+  QMap <quint64, QThread*> threadInstancesMap;
 
 public slots:
   void createPhantomJSInstance(quint64 threadId);
+  void addThreadInstance(quint64 threadId, QThread *thread);
   void deletePhantomJSInstance(quint64 threadId);
   int createPhantomJSInstance2();
 };
