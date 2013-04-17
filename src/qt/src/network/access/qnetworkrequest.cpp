@@ -695,7 +695,7 @@ static QByteArray headerValue(QNetworkRequest::KnownHeaders header, const QVaria
             result += cookie.toRawForm(QNetworkCookie::NameAndValueOnly);
         }
 //	cout << "ZZZZZZZZZZZZZZZZZZZZZ Cookie header put: " 
-	     << result.data() << endl;
+//	     << result.data() << endl;
 
         return result;
     }
