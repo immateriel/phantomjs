@@ -21,7 +21,6 @@ public:
 
 public slots:
   void doWork();
-  void client_disconnected();
   void sendConsoleMessage(const QString &message);
   void deleteThreadInstance(quint64 threadId);
 

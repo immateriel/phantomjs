@@ -191,7 +191,6 @@ private:
     QList<QPointer<WebServer> > m_servers;
     Config m_config;
     QVariantMap m_keyMap;
-    SocketServer *socketServer;
     friend class CustomPage;
 
 public:

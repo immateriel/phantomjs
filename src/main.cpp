@@ -85,17 +85,9 @@ Main *Main::instance()
   return mainInstance;
 }
 
-Phantom *Main::create_new_phantomjs()
-{
-  cout << "CCCCCC MAIN: create_new_phantomjs()" << endl;
-  Phantom *phantom = new Phantom();
-  phantom->init();
-  return phantom;
-}
-
 void Main::createPhantomJSInstance(quint64 threadId)
 {
-  cout << "CCCCCC MAIN: createPhantomJSInstance() for threadId" << threadId << endl;
+  cout << "Main: createPhantomJSInstance() for threadId" << threadId << endl;
   Phantom *phantom = new Phantom();
   phantom->init();
   //  this->phantom = phantom;
@@ -110,23 +102,10 @@ void Main::addThreadInstance(quint64 threadId, QThread *thread)
 
 void Main::deletePhantomJSInstance(quint64 threadId)
 {
-  cout << "CCCCCC MAIN: deletePhantomJSInstance() for threadId" << threadId << endl;
+  cout << "Main: deletePhantomJSInstance() for threadId" << threadId << endl;
   Phantom *phantom = phantomInstancesMap[threadId];
-  // QThread *thread = threadInstancesMap[threadId];
   phantomInstancesMap.remove(threadId);
-  // threadInstancesMap.remove(threadId);
-  cout << "CCCCCC  Instance: " << (void*) phantom << endl;
-  // thread->quit();
   delete phantom;
-}
-
-int Main::createPhantomJSInstance2()
-{
-  cout << "CCCCCC MAIN: createPhantomJSInstance2()" << endl;
-  Phantom *phantom = new Phantom();
-  phantom->init();
-  //  return phantom;
-  return 15;
 }
 
 int main(int argc, char** argv, const char** envp)
@@ -172,34 +151,13 @@ int main(int argc, char** argv, const char** envp)
     // Registering an alternative Message Handler
     qInstallMsgHandler(Utils::messageHandler);
 
-    //    Phantom *phantom = Phantom::instance();
-#if 0
-    // Get the Phantom singleton
-    Phantom *phantom = Phantom::instance();
-
-    // Start script execution
-    if (phantom->execute()) {
-        app.exec();
-    }
-
-    // End script execution: delete the phantom singleton and set execution return value
-    int retVal = phantom->returnValue();
-    delete phantom;
-    return retVal;
-#endif
-
     Main *main = Main::instance();
-    //    main->moveToThread(app.thread());
-    cout << "AAAAAAA main pointer:" << (void*)main << endl;
-    cout << "AAAAAAA main thread pointer:" << (void*)main->thread() << endl;
-    //    Phantom *phantom = main->create_new_phantomjs();
     SocketServer *socketServer = new SocketServer(main);
     QThread *thread = new QThread();
     socketServer->moveToThread(thread);
     socketServer->setup(main);
     thread->start();
     QMetaObject::invokeMethod(socketServer, "doWork", Qt::QueuedConnection);
-    cout << "ici aussi" << endl;
 
     app.exec();
 

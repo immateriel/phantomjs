@@ -156,8 +156,6 @@ void Phantom::init()
 
     setLibraryPath(QFileInfo(m_config.scriptFile()).dir().absolutePath());
 
-    cout << "Phanthom init done" << endl;
-    this->socketServer = NULL;
 }
 
 // public:
@@ -200,21 +198,9 @@ bool Phantom::execute()
         return false;
 
     if (m_config.scriptFile().isEmpty()) {
-#if 0
-      cout << "Coucou" << endl;
-
-      QThread *thread = new QThread();
-      socketServer = new SocketServer();
-      socketServer->setup(m_page->mainFrame());
-      socketServer->moveToThread(thread);
-      thread->start();
-      QMetaObject::invokeMethod(socketServer, "doWork", Qt::QueuedConnection);
-      cout << "ici aussi" << endl;
-#else
         // REPL mode requested
         // Create the REPL: it will launch itself, no need to store this variable.
         REPL::getInstance(m_page->mainFrame(), this);
-#endif
     } else {
         // Load the User Script
         if (m_config.debug()) {
