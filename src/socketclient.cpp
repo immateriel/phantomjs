@@ -18,6 +18,9 @@ using namespace std;
 /*
  */
 
+#define SOCKET_CLIENT_DEBUG 1
+// #undef SOCKET_CLIENT_DEBUG
+
 SocketClient::SocketClient(QThread *thread)
 {
   this->thread = thread;
@@ -58,7 +61,10 @@ void SocketClient::setup(Main *main, SocketServer *socketServer)
 
 void SocketClient::sendConsoleMessage(const QString &message)
 {
-//  cout << "SocketClient: message '" << message.toUtf8().data() << "'" << endl;
+#ifdef SOCKET_CLIENT_DEBUG
+  cout << "SocketClient> message sent" << endl; // '" << message.toUtf8().data() << "'" << endl;
+#endif
+
   if (client_socket != NULL)
     {
       client_socket->write(message.toUtf8().data());
@@ -68,7 +74,10 @@ void SocketClient::sendConsoleMessage(const QString &message)
 
 void SocketClient::copyJsConsoleMessageToClientSocket(const QString &message)
 {
-//  cout << "SocketClient: message '" << message.toUtf8().data() << "'" << endl;
+#ifdef SOCKET_CLIENT_DEBUG
+  cout << "SocketClient> message sent 2" << endl; //'" << message.toUtf8().data() << "'" << endl;
+#endif
+
   if (client_socket != NULL)
     {
       client_socket->write(message.toUtf8().data());
@@ -79,7 +88,7 @@ void SocketClient::copyJsConsoleMessageToClientSocket(const QString &message)
 
 void SocketClient::client_disconnected()
 {
-  cout << "SocketClient: client disconnected" << endl;
+  cout << "SocketClient> client disconnected" << endl;
   if (client_socket != NULL)
     {
       client_socket->close();
@@ -93,7 +102,7 @@ void SocketClient::client_disconnected()
 
 void SocketClient::doWork()
 {
-  cout << "SocketClient: doWork" << endl;
+  cout << "SocketClient> doWork" << endl;
 
   /* Read all data till all the input is read */
   QByteArray request_data;
@@ -107,7 +116,9 @@ void SocketClient::doWork()
   /* While connected, wait for new request */
   while (client_socket != NULL)
     {
-//      cout << "waiting for a new request of the client" << endl;
+#ifdef SOCKET_CLIENT_DEBUG
+      cout << "SocketClient> waiting for a new request of the client" << endl;
+#endif
 
       /* First read the header which consists in a line of text 
 	 telling how long in bytes is the request */
@@ -117,11 +128,15 @@ void SocketClient::doWork()
 	  qint64 status_read = client_socket->read(buf, max_nb_bytes_by_read);
 	  if (status_read == 0)
 	    {
-//	      cout << "buf 0" << endl; 
+#ifdef SOCKET_CLIENT_DEBUG
+	      cout << "SocketClient> buf 0" << endl; 
+#endif
 	    }
 	  else if (status_read == -1)
 	    {
-//	      cout << "error" << endl;
+#ifdef SOCKET_CLIENT_DEBUG
+	      cout << "SocketClient> status_read -1 error" << endl;
+#endif
 	    }
 	  else
 	    {
@@ -135,28 +150,65 @@ void SocketClient::doWork()
 	     been completely read. */
 	  if (request_data.indexOf("\n") != -1)
 	    {
-//	      cout << "endline character found" << endl;
+#ifdef SOCKET_CLIENT_DEBUG
+	      cout << "SocketClient> endline character found" << endl;
+#endif
 	      break;
 	    }
 
-//	  cout << "waiting2" << endl;
+#ifdef SOCKET_CLIENT_DEBUG
+	  cout << "SocketClient> waiting2" << endl;
+#endif
 
 	  // if (status_read == 0 && !client_socket->waitForReadyRead())
 	  //   break;
 
-	  if (!client_socket->waitForReadyRead())
+
+	  bool client_ready = false;
+
+	  for (int k = 0; k < 10 && !client_ready; k++)
 	    {
-//	      cout << "!client_socket->waitForReadyRead())" << endl;
+
+	      if (!client_socket->waitForReadyRead())
+		{
+#ifdef SOCKET_CLIENT_DEBUG
+		  cout << "SocketClient> !client_socket->waitForReadyRead())" << endl;
+#endif
+		  // break;
+		  //		  this->thread::msleep(100);
+		  msleep(100);
+		}
+	      else
+		{
+		  client_ready = true;
+#ifdef SOCKET_CLIENT_DEBUG
+		  cout << "SocketClient> client_ready!" << endl;
+#endif
+		}
+
+	    }
+	  if (!client_ready)
+	    {
+#ifdef SOCKET_CLIENT_DEBUG
+	      cout << "SocketClient> too many errors, aborting" << endl;
+#endif
 	      break;
 	    }
-//	  cout << "waiting3" << endl;
+
+#ifdef SOCKET_CLIENT_DEBUG
+	  cout << "SocketClient> waiting3" << endl;
+#endif
 
 	}
-//      cout << "Header end met" << endl;
+#ifdef SOCKET_CLIENT_DEBUG
+      cout << "SocketClient> Header end met" << endl;
+#endif
 
       if (client_socket == NULL)
 	{
-	  cout << "SocketClient: Socket null" << endl;
+#ifdef SOCKET_CLIENT_DEBUG
+	  cout << "SocketClient> Socket null" << endl;
+#endif
 	  client_disconnected();
 	  break;
 	}
@@ -170,13 +222,17 @@ void SocketClient::doWork()
 //	  cout << "Header read: «" << header_data.data() << "» " << endl;
 	  request_data  = request_data.right(request_data.size() - (index_newline + 1));
 	  request_length = atoi(header_data.data());
-//	  cout << "Length of the request in bytes:"
-//	       <<  request_length << endl;
-//	  cout << "Rest of the request: «" << request_data.data() << "» " << endl;
+#ifdef SOCKET_CLIENT_DEBUG
+	  cout << "SocketClient> Header read" << endl;
+	  cout << "SocketClient> Length of the request in bytes:"
+	       <<  request_length << endl;
+	  // cout << "Rest of the request: «" << request_data.data() << "» " << endl;
+#endif
 	}
       else
 	{
-	  cerr << "SocketClient: Error, no header found" << endl;
+	  cerr << "SocketClient> Error, no header found" << endl;
+	  cerr << "SocketClient> incorrect header_data : «" << request_data.data() << "» " << endl;
 	  client_disconnected();
 	  return;
 	}
@@ -187,11 +243,15 @@ void SocketClient::doWork()
 	  qint64 status_read = client_socket->read(buf, max_nb_bytes_by_read);
 	  if (status_read == 0)
 	    {
-//	      cout << "buf 0" << endl; 
+#ifdef SOCKET_CLIENT_DEBUG
+	      cout << "SocketClient> request read buf 0" << endl; 
+#endif
 	    }
 	  else if (status_read == -1)
 	    {
-//	      cout << "error" << endl;
+#ifdef SOCKET_CLIENT_DEBUG
+	      cout << "SocketClient> request read status_read == -1" << endl; 
+#endif
 	    }
 	  else
 	    {
@@ -201,7 +261,10 @@ void SocketClient::doWork()
 	  if (status_read == 0 && !client_socket->waitForReadyRead())
 	    break;
 	}
-//      cout << "OK whole request read, it is:«" << request_data.data () << "» " << endl;
+#ifdef SOCKET_CLIENT_DEBUG
+      cout << "SocketClient> OK whole request read" <<endl; 
+#endif
+// , it is:«" << request_data.data () << "» " << endl;
 
 //      cout << "et en invokant? " << endl;
       QMetaObject::invokeMethod(webpage->mainFrame(), "evaluateJavaScript", Qt::QueuedConnection, Q_ARG(QString, QString(request_data.data())) );
@@ -209,7 +272,9 @@ void SocketClient::doWork()
       request_data.clear();
       request_length = 0;
 
-//      cout << "JS evaluated" << endl;
+#ifdef SOCKET_CLIENT_DEBUG
+      cout << "SocketClient> JS evaluated" << endl;
+#endif
 	      
     }
 

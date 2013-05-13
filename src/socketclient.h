@@ -4,6 +4,8 @@
 #include <QWebFrame>
 #include <QTcpSocket>
 #include <QString>
+#include <QWaitCondition>
+#include <QMutex>
 
 #include "phantom.h"
 #include "webpage.h"
@@ -22,6 +24,18 @@ public:
   void setup(Main *main, SocketServer *socketServer);
   QTcpSocket *client_socket;
   SocketServer *socketServer;
+
+    // Causes the current thread to sleep for msecs milliseconds.
+    static void msleep(unsigned long msecs)
+    {
+        QMutex mutex;
+        mutex.lock();
+ 
+        QWaitCondition waitCondition;
+        waitCondition.wait(&mutex, msecs);
+ 
+        mutex.unlock();
+    }
 
 public slots:
   void doWork();
