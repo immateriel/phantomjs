@@ -43,7 +43,7 @@ QT_CFG+=' -no-phonon'
 QT_CFG+=' -no-qt3support'
 QT_CFG+=' -no-script'
 QT_CFG+=' -no-scripttools'
-QT_CFG+=' -no-svg'
+QT_CFG+=' -svg'
 QT_CFG+=' -no-xmlpatterns'
 
 # Unnecessary Qt features

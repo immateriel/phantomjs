@@ -52,6 +52,8 @@
 #include <QBuffer>
 #include <QDebug>
 #include <QImageWriter>
+#include <QtSvg>
+#include <QSvgGenerator>
 
 #include <gifwriter.h>
 
@@ -773,6 +775,30 @@ bool WebPage::render(const QString &fileName)
     QDir dir;
     dir.mkpath(fileInfo.absolutePath());
 
+    
+    if (fileName.endsWith(".svg",Qt::CaseInsensitive)) {
+      QSize contentsSize = m_mainFrame->contentsSize();
+      contentsSize -= QSize(m_scrollPosition.x(), m_scrollPosition.y());
+      QRect frameRect = QRect(QPoint(0, 0), contentsSize);
+      if (!m_clipRect.isNull())
+        frameRect = m_clipRect;
+
+      QSvgGenerator generator;
+      generator.setFileName(fileName);
+      generator.setSize(contentsSize);
+      generator.setViewBox(frameRect);
+
+      QPainter painter;
+      painter.begin(&generator);
+
+      painter.setRenderHint(QPainter::Antialiasing, true);
+      painter.setRenderHint(QPainter::TextAntialiasing, true);
+      painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+      m_mainFrame->render(&painter);
+      painter.end();
+      return true;
+    }
+    
     if (fileName.endsWith(".pdf", Qt::CaseInsensitive))
         return renderPdf(fileName);
 
