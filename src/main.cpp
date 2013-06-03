@@ -89,8 +89,12 @@ void Main::createPhantomJSInstance(quint64 threadId)
 {
   cout << "Main: createPhantomJSInstance() for threadId" << threadId << endl;
   Phantom *phantom = new Phantom();
+  phantom->config()->setWebSecurityEnabled(false);
   phantom->init();
   //  this->phantom = phantom;
+  
+  cout << "MMMMMMM CHECK :" << phantom->config()->webSecurityEnabled() << endl;
+  
   phantomInstancesMap[threadId] = phantom;
 }
 
