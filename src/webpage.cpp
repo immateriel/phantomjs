@@ -783,19 +783,20 @@ bool WebPage::render(const QString &fileName)
       if (!m_clipRect.isNull())
         frameRect = m_clipRect;
 
-      QSvgGenerator generator;
-      generator.setFileName(fileName);
-      generator.setSize(contentsSize);
-      generator.setViewBox(frameRect);
+      // TODO: commentage temp
+      // QSvgGenerator generator;
+      // generator.setFileName(fileName);
+      // generator.setSize(contentsSize);
+      // generator.setViewBox(frameRect);
 
-      QPainter painter;
-      painter.begin(&generator);
+      // QPainter painter;
+      // painter.begin(&generator);
 
-      painter.setRenderHint(QPainter::Antialiasing, true);
-      painter.setRenderHint(QPainter::TextAntialiasing, true);
-      painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
-      m_mainFrame->render(&painter);
-      painter.end();
+      // painter.setRenderHint(QPainter::Antialiasing, true);
+      // painter.setRenderHint(QPainter::TextAntialiasing, true);
+      // painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+      // m_mainFrame->render(&painter);
+      // painter.end();
       return true;
     }
     

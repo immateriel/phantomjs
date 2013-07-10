@@ -6,7 +6,7 @@ QT_CFG=''
 
 BUILD_CONFIRM=0
 COMPILE_JOBS=1
-MAKEFLAGS_JOBS=''
+MAKEFLAGS_JOBS='8'
 
 if [[ "$MAKEFLAGS" != "" ]]; then
   MAKEFLAGS_JOBS=$(echo $MAKEFLAGS | egrep -o '\-j[0-9]+' | egrep -o '[0-9]+')

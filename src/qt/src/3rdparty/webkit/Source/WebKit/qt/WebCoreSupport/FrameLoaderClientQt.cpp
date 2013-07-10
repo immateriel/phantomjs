@@ -92,6 +92,10 @@
 #include <QStringList>
 #include <wtf/OwnPtr.h>
 
+#include <iostream>
+using namespace std;
+#include <unistd.h>
+
 static QMap<unsigned long, QString> dumpAssignedUrls;
 
 // Compare with the file "WebKit/Tools/DumpRenderTree/mac/FrameLoadDelegate.mm".
@@ -1197,22 +1201,36 @@ WebCore::Frame* FrameLoaderClientQt::dispatchCreatePage(const WebCore::Navigatio
 
 void FrameLoaderClientQt::dispatchDecidePolicyForResponse(FramePolicyFunction function, const WebCore::ResourceResponse& response, const WebCore::ResourceRequest&)
 {
+  cout << "ZZZZZZZZZZZZZZZZ20130625 dispatchDecidePolicyForResponse" << endl;
+
     // We need to call directly here.
     switch (response.httpStatusCode()) {
     case HTTPResetContent:
         // FIXME: a 205 response requires that the requester reset the document view.
         // Fallthrough
     case HTTPNoContent:
+        cout << "ZZZZZZZZZZZZZZZZ20130625 callPolicyFunction" << endl;
         callPolicyFunction(function, PolicyIgnore);
         return;
     }
 
+    
+
     if (WebCore::contentDispositionType(response.httpHeaderField("Content-Disposition")) == WebCore::ContentDispositionAttachment)
+      {
+	cout << "ZZZZZZZZZZZZZZZZ20130625 dispatchDecidePolicyForResponse, attachment thus PolicyDownload: "  << response.url().string().utf8().data() << endl;
         callPolicyFunction(function, PolicyDownload);
+      }
     else if (canShowMIMEType(response.mimeType()))
+      {
+	cout << "ZZZZZZZZZZZZZZZZ20130625 dispatchDecidePolicyForResponse, can show MIME type thus PolicyUse: "  << response.url().string().utf8().data() << endl;
         callPolicyFunction(function, PolicyUse);
+      }
     else
+      {
+	cout << "ZZZZZZZZZZZZZZZZ20130625 dispatchDecidePolicyForResponse, unknown thus PolicyDownload: "  << response.url().string().utf8().data() << endl;
         callPolicyFunction(function, PolicyDownload);
+      }
 }
 
 void FrameLoaderClientQt::dispatchDecidePolicyForNewWindowAction(FramePolicyFunction function, const WebCore::NavigationAction& action, const WebCore::ResourceRequest& request, PassRefPtr<WebCore::FormState>, const WTF::String&)
