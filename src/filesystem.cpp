@@ -38,7 +38,7 @@
 // File
 // public:
 File::File(QFile *openfile, QTextCodec *codec, QObject *parent) :
-    REPLCompletable(parent),
+    QObject(parent),
     m_file(openfile),
     m_fileStream(0)
 {
@@ -59,8 +59,18 @@ File::~File()
 //      encounters \0 or similar
 
 // public slots:
-QString File::read()
+QString File::read(const QVariant &n)
 {
+    // Default to 1024 (used when n is "null")
+    qint64 bytesToRead = 1024;
+
+    // If parameter can be converted to a qint64, do so and use that value instead
+    if (n.canConvert(QVariant::LongLong)) {
+        bytesToRead = n.toLongLong();
+    }
+
+    const bool isReadAll = 0 > bytesToRead;
+
     if ( !m_file->isReadable() ) {
         qDebug() << "File::read - " << "Couldn't read:" << m_file->fileName();
         return QString();
@@ -71,17 +81,31 @@ QString File::read()
     }
     if ( m_fileStream ) {
         // text file
-        const qint64 pos = m_fileStream->pos();
-        m_fileStream->seek(0);
-        const QString ret = m_fileStream->readAll();
-        m_fileStream->seek(pos);
+        QString ret;
+        if (isReadAll) {
+            // This code, for some reason, reads the whole file from 0 to EOF,
+            // and then resets to the position the file was at prior to reading
+            const qint64 pos = m_fileStream->pos();
+            m_fileStream->seek(0);
+            ret = m_fileStream->readAll();
+            m_fileStream->seek(pos);
+        } else {
+            ret = m_fileStream->read(bytesToRead);
+        }
         return ret;
     } else {
         // binary file
-        const qint64 pos = m_file->pos();
-        m_file->seek(0);
-        const QByteArray data = m_file->readAll();
-        m_file->seek(pos);
+        QByteArray data;
+        if (isReadAll) {
+            // This code, for some reason, reads the whole file from 0 to EOF,
+            // and then resets to the position the file was at prior to reading
+            const qint64 pos = m_file->pos();
+            m_file->seek(0);
+            data = m_file->readAll();
+            m_file->seek(pos);
+        } else {
+            data = m_file->read(bytesToRead);
+        }
         QString ret(data.size());
         for(int i = 0; i < data.size(); ++i) {
             ret[i] = data.at(i);
@@ -99,6 +123,9 @@ bool File::write(const QString &data)
     if ( m_fileStream ) {
         // text file
         (*m_fileStream) << data;
+        if (_isUnbuffered()) {
+            m_fileStream->flush();
+        }
         return true;
     } else {
         // binary file
@@ -107,6 +134,15 @@ bool File::write(const QString &data)
             bytes[i] = data.at(i).toAscii();
         }
         return m_file->write(bytes);
+    }
+}
+
+bool File::seek(const qint64 pos)
+{
+    if (m_fileStream) {
+        return m_fileStream->seek(pos);
+    } else {
+        return m_file->seek(pos);
     }
 }
 
@@ -180,23 +216,61 @@ void File::close()
     deleteLater();
 }
 
-void File::initCompletions()
+bool File::setEncoding(const QString &encoding) {
+    if (encoding.isEmpty() || encoding.isNull()) {
+        return false;
+    }
+
+    // "Binary" mode doesn't use/need text codecs
+    if ((QTextStream *)NULL == m_fileStream) {
+        // TODO: Should we switch to "text" mode?
+        return false;
+    }
+
+    // Since there can be multiple names for the same codec (i.e., "utf8" and
+    // "utf-8"), we need to get the codec in the system first and use its
+    // canonical name
+    QTextCodec *codec = QTextCodec::codecForName(encoding.toAscii());
+    if ((QTextCodec *)NULL == codec) {
+      return false;
+    }
+
+    // Check whether encoding actually needs to be changed
+    const QString encodingBeforeUpdate(m_fileStream->codec()->name());
+    if (0 == encodingBeforeUpdate.compare(QString(codec->name()), Qt::CaseInsensitive)) {
+        return false;
+    }
+
+    m_fileStream->setCodec(codec);
+
+    // Return whether update was successful
+    const QString encodingAfterUpdate(m_fileStream->codec()->name());
+    return 0 != encodingBeforeUpdate.compare(encodingAfterUpdate, Qt::CaseInsensitive);
+}
+
+QString File::getEncoding() const
 {
-    // Add completion for the Dynamic Properties of the 'file' object
-    // functions
-    addCompletion("read");
-    addCompletion("write");
-    addCompletion("readLine");
-    addCompletion("writeLine");
-    addCompletion("flush");
-    addCompletion("close");
+    QString encoding;
+
+    if ((QTextStream *)NULL != m_fileStream) {
+        encoding = QString(m_fileStream->codec()->name());
+    }
+
+    return encoding;
+}
+
+// private:
+
+bool File::_isUnbuffered() const
+{
+    return m_file->openMode() & QIODevice::Unbuffered;
 }
 
 
 // FileSystem
 // public:
 FileSystem::FileSystem(QObject *parent)
-    : REPLCompletable(parent)
+    : QObject(parent)
 { }
 
 // public slots:
@@ -354,12 +428,24 @@ bool FileSystem::changeWorkingDirectory(const QString &path) const
 
 QString FileSystem::absolute(const QString &relativePath) const
 {
-   return QFileInfo(relativePath).absoluteFilePath();
+    return QFileInfo(relativePath).absoluteFilePath();
+}
+
+QString FileSystem::fromNativeSeparators(const QString &path) const
+{
+    return QDir::fromNativeSeparators(path);
+}
+
+QString FileSystem::toNativeSeparators(const QString &path) const
+{
+    return QDir::toNativeSeparators(path);
 }
 
 // Files
 QObject *FileSystem::_open(const QString &path, const QVariantMap &opts) const
 {
+    qDebug() << "FileSystem - _open:" << path << opts;
+
     const QVariant modeVar = opts["mode"];
     // Ensure only strings
     if (modeVar.type() != QVariant::String) {
@@ -441,38 +527,4 @@ bool FileSystem::_remove(const QString &path) const
 
 bool FileSystem::_copy(const QString &source, const QString &destination) const {
     return QFile(source).copy(destination);
-}
-
-void FileSystem::initCompletions()
-{
-    // Add completion for the Dynamic Properties of the 'fs' object
-    // properties
-    addCompletion("separator");
-    addCompletion("workingDirectory");
-    // functions
-    addCompletion("list");
-    addCompletion("absolute");
-    addCompletion("readLink");
-    addCompletion("exists");
-    addCompletion("isDirectory");
-    addCompletion("isFile");
-    addCompletion("isAbsolute");
-    addCompletion("isExecutable");
-    addCompletion("isReadable");
-    addCompletion("isWritable");
-    addCompletion("isLink");
-    addCompletion("changeWorkingDirectory");
-    addCompletion("makeDirectory");
-    addCompletion("makeTree");
-    addCompletion("removeDirectory");
-    addCompletion("removeTree");
-    addCompletion("copyTree");
-    addCompletion("open");
-    addCompletion("read");
-    addCompletion("write");
-    addCompletion("size");
-    addCompletion("remove");
-    addCompletion("copy");
-    addCompletion("move");
-    addCompletion("touch");
 }

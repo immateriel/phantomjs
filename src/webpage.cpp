@@ -44,6 +44,8 @@
 #include <QNetworkRequest>
 #include <QPainter>
 #include <QPrinter>
+#include <QWebHistory>
+#include <QWebHistoryItem>
 #include <QWebElement>
 #include <QWebFrame>
 #include <QWebPage>
@@ -54,6 +56,7 @@
 #include <QImageWriter>
 #include <QtSvg>
 #include <QSvgGenerator>
+#include <QUuid>
 
 #include <gifwriter.h>
 
@@ -64,12 +67,22 @@
 #include "consts.h"
 #include "callback.h"
 #include "cookiejar.h"
+#include "system.h"
+
+#ifdef Q_OS_WIN32
+#include <io.h>
+#include <fcntl.h>
+#endif
 
 // Ensure we have at least head and body.
 #define BLANK_HTML                      "<html><head></head><body></body></html>"
 #define CALLBACKS_OBJECT_NAME           "_phantom"
 #define INPAGE_CALL_NAME                "window.callPhantom"
 #define CALLBACKS_OBJECT_INJECTION      INPAGE_CALL_NAME" = function() { return window."CALLBACKS_OBJECT_NAME".call.call(_phantom, Array.prototype.splice.call(arguments, 0)); };"
+#define CALLBACKS_OBJECT_PRESENT        "typeof(window."CALLBACKS_OBJECT_NAME") !== \"undefined\";"
+
+#define STDOUT_FILENAME "/dev/stdout"
+#define STDERR_FILENAME "/dev/stderr"
 
 #include <iostream>
 using namespace std;
@@ -95,7 +108,7 @@ public:
         Q_UNUSED(option);
 
         if (extension == ChooseMultipleFilesExtension) {
-            static_cast<ChooseMultipleFilesExtensionReturn*>(output)->fileNames = QStringList(m_uploadFile);
+            static_cast<ChooseMultipleFilesExtensionReturn*>(output)->fileNames = m_uploadFiles;
             return true;
         } else {
             return false;
@@ -115,8 +128,17 @@ protected:
 
     QString chooseFile(QWebFrame *originatingFrame, const QString &oldFile) {
         Q_UNUSED(originatingFrame);
-        Q_UNUSED(oldFile);
-        return m_uploadFile;
+
+        // Check if User set a file via File Picker
+        QString chosenFile = m_webPage->filePicker(oldFile);
+        if (chosenFile == QString::null && m_uploadFiles.count() > 0) {
+            // Check if instead User set a file via uploadFile API
+            chosenFile = m_uploadFiles.first();
+        }
+
+        // Return the value coming from the "filePicker" callback, IFF not null.
+        qDebug() << "CustomPage - file chosen for upload:" << chosenFile;
+        return chosenFile;
     }
 
     void javaScriptAlert(QWebFrame *originatingFrame, const QString &msg) {
@@ -176,14 +198,15 @@ protected:
             navigationType = "Other";
             break;
         }
-
+        bool isNavigationLocked = m_webPage->navigationLocked();
+        
         emit m_webPage->navigationRequested(
                     request.url(),                   //< Requested URL
                     navigationType,                  //< Navigation Type
-                    !m_webPage->navigationLocked(),  //< Is navigation locked?
+                    !isNavigationLocked,             //< Will navigate (not locked)?
                     isMainFrame);                    //< Is main frame?
 
-        return !m_webPage->navigationLocked();
+        return !isNavigationLocked;
     }
 
     QWebPage *createWindow (WebWindowType type) {
@@ -211,7 +234,7 @@ protected:
 private:
     WebPage *m_webPage;
     QString m_userAgent;
-    QString m_uploadFile;
+    QStringList m_uploadFiles;
     friend class WebPage;
 };
 
@@ -231,19 +254,33 @@ public:
     WebpageCallbacks(QObject *parent = 0)
         : QObject(parent)
         , m_genericCallback(NULL)
+        , m_filePickerCallback(NULL)
         , m_jsConfirmCallback(NULL)
         , m_jsPromptCallback(NULL)
     {
     }
 
     QObject *getGenericCallback() {
+        qDebug() << "WebpageCallbacks - getGenericCallback";
+
         if (!m_genericCallback) {
             m_genericCallback = new Callback(this);
         }
         return m_genericCallback;
     }
 
+    QObject *getFilePickerCallback() {
+        qDebug() << "WebpageCallbacks - getFilePickerCallback";
+
+        if (!m_filePickerCallback) {
+            m_filePickerCallback = new Callback(this);
+        }
+        return m_filePickerCallback;
+    }
+
     QObject *getJsConfirmCallback() {
+        qDebug() << "WebpageCallbacks - getJsConfirmCallback";
+
         if (!m_jsConfirmCallback) {
             m_jsConfirmCallback = new Callback(this);
         }
@@ -251,6 +288,8 @@ public:
     }
 
     QObject *getJsPromptCallback() {
+        qDebug() << "WebpageCallbacks - getJsConfirmCallback";
+
         if (!m_jsPromptCallback) {
             m_jsPromptCallback = new Callback(this);
         }
@@ -267,6 +306,7 @@ public slots:
 
 private:
     Callback *m_genericCallback;
+    Callback *m_filePickerCallback;
     Callback *m_jsConfirmCallback;
     Callback *m_jsPromptCallback;
 
@@ -287,26 +327,43 @@ private:
 
 
 WebPage::WebPage(QObject *parent, const QUrl &baseUrl)
-    : REPLCompletable(parent)
-    , m_callbacks(NULL)
+    : QObject(parent)
     , m_navigationLocked(false)
     , m_mousePos(QPoint(0, 0))
     , m_ownsPages(true)
+    , m_loadingProgress(0)
 {
     setObjectName("WebPage");
+    m_callbacks = new WebpageCallbacks(this);
     m_customWebPage = new CustomPage(this);
     m_mainFrame = m_customWebPage->mainFrame();
+    m_currentFrame = m_mainFrame;
     m_mainFrame->setHtml(BLANK_HTML, baseUrl);
-    changeCurrentFrame(m_mainFrame);
 
     Config *phantomCfg = Phantom::instance()->config();
 
-    connect(m_mainFrame, SIGNAL(javaScriptWindowObjectCleared()), this, SLOT(handleJavaScriptWindowObjectCleared()));
+    // NOTE: below you can see that between all the event handlers
+    // we listen for, "SLOT(setupFrame())" is connected to 2 signals:
+    //   1. page.loadFinished
+    //   2. mainFrame.javaScriptWindowObjectCleared
+    // We have found out that, despite our understanding, the event #1 above
+    // fires BEFORE the event #2 when loading a url.
+    // But, if no page load is requested, #2 is the only one to fire.
+    //
+    // So, we call the slot twice to setup the main frame
+    // (no parameter == main frame) but we make sure to do the setup only once.
+    //
+    // @see WebPage::setupFrame(QWebFrame *) for details.
+    connect(m_mainFrame, SIGNAL(loadStarted()), this, SLOT(switchToMainFrame()), Qt::QueuedConnection);
+    connect(m_mainFrame, SIGNAL(loadFinished(bool)), this, SLOT(setupFrame()), Qt::QueuedConnection);
+    connect(m_customWebPage, SIGNAL(frameCreated(QWebFrame*)), this, SLOT(setupFrame(QWebFrame*)), Qt::DirectConnection);
+    connect(m_mainFrame, SIGNAL(javaScriptWindowObjectCleared()), this, SLOT(setupFrame()));
     connect(m_mainFrame, SIGNAL(javaScriptWindowObjectCleared()), SIGNAL(initialized()));
     connect(m_mainFrame, SIGNAL(urlChanged(QUrl)), SIGNAL(urlChanged(QUrl)));
     connect(m_customWebPage, SIGNAL(loadStarted()), SIGNAL(loadStarted()), Qt::QueuedConnection);
     connect(m_customWebPage, SIGNAL(loadFinished(bool)), SLOT(finish(bool)), Qt::QueuedConnection);
-    connect(m_customWebPage, SIGNAL(windowCloseRequested()), this, SLOT(close()));
+    connect(m_customWebPage, SIGNAL(windowCloseRequested()), this, SLOT(close()), Qt::QueuedConnection);
+    connect(m_customWebPage, SIGNAL(loadProgress(int)), this, SLOT(updateLoadingProgress(int)));
 
     // Start with transparent background.
     QPalette palette = m_customWebPage->palette();
@@ -341,10 +398,14 @@ WebPage::WebPage(QObject *parent, const QUrl &baseUrl)
     // Custom network access manager to allow traffic monitoring.
     m_networkAccessManager = new NetworkAccessManager(this, phantomCfg);
     m_customWebPage->setNetworkAccessManager(m_networkAccessManager);
-    connect(m_networkAccessManager, SIGNAL(resourceRequested(QVariant)),
-            SIGNAL(resourceRequested(QVariant)));
+    connect(m_networkAccessManager, SIGNAL(resourceRequested(QVariant, QObject *)),
+            SIGNAL(resourceRequested(QVariant, QObject *)));
     connect(m_networkAccessManager, SIGNAL(resourceReceived(QVariant)),
             SIGNAL(resourceReceived(QVariant)));
+    connect(m_networkAccessManager, SIGNAL(resourceError(QVariant)),
+            SIGNAL(resourceError(QVariant)));
+    connect(m_networkAccessManager, SIGNAL(resourceTimeout(QVariant)),
+            SIGNAL(resourceTimeout(QVariant)));
 
     // unsupported content downloader
     connect(m_customWebPage, SIGNAL(unsupportedContent(QNetworkReply*)), SLOT(handleUnsupportedContent(QNetworkReply*))); 
@@ -455,9 +516,29 @@ void WebPage::setContent(const QString &content)
     m_mainFrame->setHtml(content);
 }
 
+void WebPage::setContent(const QString &content, const QString &baseUrl)
+{
+    if (baseUrl == "about:blank") {
+        m_mainFrame->setHtml(BLANK_HTML);
+    } else {
+        m_mainFrame->setHtml(content, QUrl(baseUrl));
+    }
+}
+
+
 void WebPage::setFrameContent(const QString &content)
 {
     m_currentFrame->setHtml(content);
+}
+
+QString WebPage::title() const
+{
+    return m_mainFrame->title();
+}
+
+QString WebPage::frameTitle() const
+{
+    return m_currentFrame->title();
 }
 
 QString WebPage::url() const
@@ -469,6 +550,73 @@ QString WebPage::frameUrl() const
 {
     return m_currentFrame->url().toString();
 }
+
+bool WebPage::loading() const
+{
+    // Return "true" if Load Progress is "]0, 100["
+    return (0 < m_loadingProgress && m_loadingProgress < 100);
+}
+
+int WebPage::loadingProgress() const
+{
+    return m_loadingProgress;
+}
+
+bool WebPage::canGoBack()
+{
+    return m_customWebPage->history()->canGoBack();
+}
+
+bool WebPage::goBack()
+{
+    if (canGoBack()) {
+        m_customWebPage->history()->back();
+        return true;
+    }
+    return false;
+}
+
+bool WebPage::canGoForward()
+{
+    return m_customWebPage->history()->canGoForward();
+}
+
+bool WebPage::goForward()
+{
+    if (canGoForward()) {
+        m_customWebPage->history()->forward();
+        return true;
+    }
+    return false;
+}
+
+bool WebPage::go(int historyItemRelativeIndex)
+{
+    // Convert the relative index to absolute
+    int historyItemIndex = m_customWebPage->history()->currentItemIndex() + historyItemRelativeIndex;
+
+    // Fetch the right item from the history
+    QWebHistoryItem historyItem = m_customWebPage->history()->itemAt(historyItemIndex);
+
+    // Go to the history item, if it's valid
+    if (historyItem.isValid()) {
+        m_customWebPage->history()->goToItem(historyItem);
+        return true;
+    }
+
+    return false;
+}
+
+void WebPage::reload()
+{
+    m_customWebPage->triggerAction(QWebPage::Reload);
+}
+
+void WebPage::stop()
+{
+    m_customWebPage->triggerAction(QWebPage::Stop);
+}
+
 
 QString WebPage::plainText() const
 {
@@ -533,6 +681,13 @@ void WebPage::applySettings(const QVariantMap &def)
 
     if (def.contains(PAGE_SETTINGS_PASSWORD))
         m_networkAccessManager->setPassword(def[PAGE_SETTINGS_PASSWORD].toString());
+
+    if (def.contains(PAGE_SETTINGS_MAX_AUTH_ATTEMPTS))
+        m_networkAccessManager->setMaxAuthAttempts(def[PAGE_SETTINGS_MAX_AUTH_ATTEMPTS].toInt());
+
+    if (def.contains(PAGE_SETTINGS_RESOURCE_TIMEOUT))
+        m_networkAccessManager->setResourceTimeout(def[PAGE_SETTINGS_RESOURCE_TIMEOUT].toInt());
+
 }
 
 QString WebPage::userAgent() const
@@ -542,7 +697,7 @@ QString WebPage::userAgent() const
 
 void WebPage::setNavigationLocked(bool lock)
 {
-    m_navigationLocked = lock;;
+    m_navigationLocked = lock;
 }
 
 bool WebPage::navigationLocked()
@@ -618,10 +773,37 @@ QVariantMap WebPage::paperSize() const
 QVariant WebPage::evaluateJavaScript(const QString &code)
 {
 //  cout << "WebPage::evaluateJavaScript called: ««" << code.toUtf8().data() << "»»" << endl;
+    QVariant evalResult;
     QString function = "(" + code + ")()";
-    return m_currentFrame->evaluateJavaScript(
-                function,
-                QString("phantomjs://webpage.evaluate()"));
+
+    qDebug() << "WebPage - evaluateJavaScript" << function;
+
+    evalResult = m_currentFrame->evaluateJavaScript(
+                function,                                   //< function evaluated
+                QString("phantomjs://webpage.evaluate()")); //< reference source file
+
+    qDebug() << "WebPage - evaluateJavaScript result" << evalResult;
+
+    return evalResult;
+}
+
+QString WebPage::filePicker(const QString &oldFile)
+{
+    qDebug() << "WebPage - filePicker" << "- old file:" << oldFile;
+
+    if (m_callbacks->m_filePickerCallback) {
+        QVariant res = m_callbacks->m_filePickerCallback->call(QVariantList() << oldFile);
+
+        if (res.canConvert<QString>()) {
+            QString filePath = res.toString();
+            qDebug() << "WebPage - filePicker" << "- new file:" << filePath;
+            // Return this value only if the file actually exists
+            if (QFile::exists(filePath)) {
+                return filePath;
+            }
+        }
+    }
+    return QString::null;
 }
 
 bool WebPage::javaScriptConfirm(const QString &msg)
@@ -708,10 +890,13 @@ void WebPage::openUrl(const QString &address, const QVariant &op, const QVariant
         operation = op.toString();
 
     if (op.type() == QVariant::Map) {
-        operation = op.toMap().value("operation").toString();
-        body = op.toMap().value("data").toByteArray();
-        if (op.toMap().contains("headers")) {
-            QMapIterator<QString, QVariant> i(op.toMap().value("headers").toMap());
+        QVariantMap settingsMap = op.toMap();
+        operation = settingsMap.value("operation").toString();
+        QString bodyString = settingsMap.value("data").toString();
+        QString encoding = settingsMap.value("encoding").toString().toLower();
+        body = encoding == "utf-8" || encoding == "utf8" ? bodyString.toUtf8() : bodyString.toAscii();
+        if (settingsMap.contains("headers")) {
+            QMapIterator<QString, QVariant> i(settingsMap.value("headers").toMap());
             while (i.hasNext()) {
                 i.next();
                 request.setRawHeader(i.key().toUtf8(), i.value().toString().toUtf8());
@@ -766,14 +951,96 @@ void WebPage::close() {
     deleteLater();
 }
 
-bool WebPage::render(const QString &fileName)
+bool WebPage::render(const QString &fileName, const QVariantMap &option)
 {
     if (m_mainFrame->contentsSize().isEmpty())
         return false;
 
-    QFileInfo fileInfo(fileName);
-    QDir dir;
-    dir.mkpath(fileInfo.absolutePath());
+    QString outFileName = fileName;
+    QString tempFileName = "";
+
+    QString format = "";
+    int quality = -1; // QImage#save default
+
+    if( fileName == STDOUT_FILENAME || fileName == STDERR_FILENAME ){
+        if( !QFile::exists(fileName) ){
+            // create temporary file for OS that have no /dev/stdout or /dev/stderr. (ex. windows)
+            tempFileName = QDir::tempPath() + "/phantomjstemp" + QUuid::createUuid().toString();
+            outFileName = tempFileName;
+        }
+
+        format = "png"; // default format for stdout and stderr
+    }
+    else{
+        QFileInfo fileInfo(outFileName);
+        QDir dir;
+        dir.mkpath(fileInfo.absolutePath());
+    }
+
+    if( option.contains("format") ){
+        format = option.value("format").toString();
+    }
+    else if (fileName.endsWith(".pdf", Qt::CaseInsensitive) ){
+        format = "pdf";
+    }
+    else if (fileName.endsWith(".gif", Qt::CaseInsensitive) ){
+        format = "gif";
+    }
+
+    if( option.contains("quality") ){
+        quality = option.value("quality").toInt();
+    }
+
+    bool retval = true;
+    if ( format == "pdf" ){
+        retval = renderPdf(outFileName);
+    }
+    else if ( format == "gif" ) {
+        QImage rawPageRendering = renderImage();
+        retval = exportGif(rawPageRendering, outFileName);
+    }
+    else{
+        QImage rawPageRendering = renderImage();
+
+        const char *f = 0; // 0 is QImage#save default
+        if( format != "" ){
+            f = format.toUtf8().constData();
+        }
+
+        retval = rawPageRendering.save(outFileName, f, quality);
+    }
+
+    if( tempFileName != "" ){
+        // cleanup temporary file and render to stdout or stderr 
+        QFile i(tempFileName);
+        i.open(QIODevice::ReadOnly);
+        
+        QByteArray ba = i.readAll();
+        
+        System *system = (System*)Phantom::instance()->createSystem();
+        if( fileName == STDOUT_FILENAME ){
+#ifdef Q_OS_WIN32
+            _setmode(_fileno(stdout), O_BINARY);
+#endif
+
+            ((File *)system->_stdout())->write(QString::fromAscii(ba.constData(), ba.size()));
+
+#ifdef Q_OS_WIN32
+            _setmode(_fileno(stdout), O_TEXT);
+#endif          
+        }
+        else if( fileName == STDERR_FILENAME ){
+#ifdef Q_OS_WIN32
+            _setmode(_fileno(stderr), O_BINARY);
+#endif
+
+            ((File *)system->_stderr())->write(QString::fromAscii(ba.constData(), ba.size()));
+#ifdef Q_OS_WIN32
+            _setmode(_fileno(stderr), O_TEXT);
+#endif          
+        }
+
+        i.close();
 
     
     if (fileName.endsWith(".svg",Qt::CaseInsensitive)) {
@@ -803,12 +1070,10 @@ bool WebPage::render(const QString &fileName)
     if (fileName.endsWith(".pdf", Qt::CaseInsensitive))
         return renderPdf(fileName);
 
-    QImage buffer = renderImage();
-    if (fileName.toLower().endsWith(".gif")) {
-        return exportGif(buffer, fileName);
+        QFile::remove(tempFileName);
     }
 
-    return buffer.save(fileName);
+    return retval;
 }
 
 QString WebPage::renderBase64(const QByteArray &format)
@@ -852,7 +1117,7 @@ QImage WebPage::renderImage()
 #endif
 
     QImage buffer(frameRect.size(), format);
-    buffer.fill(qRgba(255, 255, 255, 0));
+    buffer.fill(Qt::transparent);
 
     QPainter painter;
 
@@ -866,7 +1131,7 @@ QImage WebPage::renderImage()
         for (int y = 0; y < vtiles; ++y) {
 
             QImage tileBuffer(tileSize, tileSize, format);
-            tileBuffer.fill(qRgba(255, 255, 255, 0));
+            tileBuffer.fill(Qt::transparent);
 
             // Render the web page onto the small tile first
             painter.begin(&tileBuffer);
@@ -1095,13 +1360,20 @@ QString WebPage::footer(int page, int numPages)
     return getHeaderFooter(m_paperSize, "footer", m_mainFrame, page, numPages);
 }
 
-void WebPage::uploadFile(const QString &selector, const QString &fileName)
+void WebPage::_uploadFile(const QString &selector, const QStringList &fileNames)
 {
     QWebElement el = m_currentFrame->findFirstElement(selector);
     if (el.isNull())
         return;
 
-    m_customWebPage->m_uploadFile = fileName;
+    // Filter out "fileNames" that don't actually exist
+    m_customWebPage->m_uploadFiles.clear();
+    for (int i = 0, ilen = fileNames.length(); i < ilen; ++i) {
+        if (QFile::exists(fileNames[i])) {
+            m_customWebPage->m_uploadFiles.append(fileNames[i]);
+        }
+    }
+
     el.evaluateJavaScript(JS_ELEMENT_CLICK);
 }
 
@@ -1121,7 +1393,17 @@ QObject *WebPage::_getGenericCallback() {
     return m_callbacks->getGenericCallback();
 }
 
-QObject *WebPage::_getJsConfirmCallback() {
+QObject *WebPage::_getFilePickerCallback()
+{
+    if (!m_callbacks) {
+        m_callbacks = new WebpageCallbacks(this);
+    }
+
+    return m_callbacks->getFilePickerCallback();
+}
+
+QObject *WebPage::_getJsConfirmCallback()
+{
     if (!m_callbacks) {
         m_callbacks = new WebpageCallbacks(this);
     }
@@ -1129,7 +1411,8 @@ QObject *WebPage::_getJsConfirmCallback() {
     return m_callbacks->getJsConfirmCallback();
 }
 
-QObject *WebPage::_getJsPromptCallback() {
+QObject *WebPage::_getJsPromptCallback()
+{
     if (!m_callbacks) {
         m_callbacks = new WebpageCallbacks(this);
     }
@@ -1137,8 +1420,9 @@ QObject *WebPage::_getJsPromptCallback() {
     return m_callbacks->getJsPromptCallback();
 }
 
-void WebPage::sendEvent(const QString &type, const QVariant &arg1, const QVariant &arg2, const QString &mouseButton)
+void WebPage::sendEvent(const QString &type, const QVariant &arg1, const QVariant &arg2, const QString &mouseButton, const QVariant &modifierArg)
 {
+    Qt::KeyboardModifiers keyboardModifiers(modifierArg.toInt());
     // Normalize the event "type" to lowercase
     const QString eventType = type.toLower();
 
@@ -1167,7 +1451,7 @@ void WebPage::sendEvent(const QString &type, const QVariant &arg1, const QVarian
             // assume a raw integer char code was given
             key = arg1.toInt();
         }
-        QKeyEvent *keyEvent = new QKeyEvent(keyEventType, key, Qt::NoModifier, text);
+        QKeyEvent *keyEvent = new QKeyEvent(keyEventType, key, keyboardModifiers, text);
         QApplication::postEvent(m_customWebPage, keyEvent);
         QApplication::processEvents();
         return;
@@ -1178,14 +1462,14 @@ void WebPage::sendEvent(const QString &type, const QVariant &arg1, const QVarian
         if (arg1.type() == QVariant::String) {
             // this is the case for e.g. sendEvent("...", 'A')
             // but also works with sendEvent("...", "ABCD")
-            foreach(QChar typeChar, arg1.toString()) {
-                sendEvent("keydown", typeChar);
-                sendEvent("keyup", typeChar);
+            foreach(const QChar typeChar, arg1.toString()) {
+                sendEvent("keydown", typeChar, QVariant(), QString(), modifierArg);
+                sendEvent("keyup", typeChar, QVariant(), QString(), modifierArg);
             }
         } else {
             // otherwise we assume a raw integer char-code was given
-            sendEvent("keydown", arg1.toInt());
-            sendEvent("keyup", arg1.toInt());
+            sendEvent("keydown", arg1.toInt(), QVariant(), QString(), modifierArg);
+            sendEvent("keyup", arg1.toInt(), QVariant(), QString(), modifierArg);
         }
         return;
     }
@@ -1228,9 +1512,9 @@ void WebPage::sendEvent(const QString &type, const QVariant &arg1, const QVarian
             m_mousePos.setY(arg2.toInt());
         }
 
-        // Prepare the Mouse event (no modifiers or other buttons are supported for now)
+        // Prepare the Mouse event
         qDebug() << "Mouse Event:" << eventType << "(" << mouseEventType << ")" << m_mousePos << ")" << button << buttons;
-        QMouseEvent *event = new QMouseEvent(mouseEventType, m_mousePos, button, buttons, Qt::NoModifier);
+        QMouseEvent *event = new QMouseEvent(mouseEventType, m_mousePos, button, buttons, keyboardModifiers);
 
         // Post and process events
         QApplication::postEvent(m_customWebPage, event);
@@ -1258,8 +1542,9 @@ QObjectList WebPage::pages() const
 {
     QObjectList pages;
 
-    foreach(QObject *p, this->findChildren<WebPage *>()) {
-        pages << p;
+    QList<WebPage *> childPages = this->findChildren<WebPage *>();
+    for (int i = childPages.length() -1; i >= 0; --i) {
+        pages << childPages.at(i);
     }
 
     return pages;
@@ -1269,7 +1554,7 @@ QStringList WebPage::pagesWindowName() const
 {
     QStringList pagesWindowName;
 
-    foreach (WebPage *p, this->findChildren<WebPage *>()) {
+    foreach (const WebPage *p, this->findChildren<WebPage *>()) {
         pagesWindowName << p->windowName();
     }
 
@@ -1278,9 +1563,10 @@ QStringList WebPage::pagesWindowName() const
 
 QObject *WebPage::getPage(const QString &windowName) const
 {
-    foreach (WebPage *p, this->findChildren<WebPage *>()) {
-        if (p->windowName() == windowName) {
-            return p;
+    QList<WebPage *> childPages = this->findChildren<WebPage *>();
+    for (int i = childPages.length() -1; i >= 0; --i) {
+        if (childPages.at(i)->windowName() == windowName) {
+            return childPages.at(i);
         }
     }
     return NULL;
@@ -1310,7 +1596,7 @@ QStringList WebPage::framesName() const
 {
     QStringList framesName;
 
-    foreach(QWebFrame *f, m_currentFrame->childFrames()) {
+    foreach(const QWebFrame *f, m_currentFrame->childFrames()) {
         framesName << f->frameName();
     }
     return framesName;
@@ -1323,14 +1609,18 @@ QStringList WebPage::childFramesName() const //< deprecated
 
 void WebPage::changeCurrentFrame(QWebFrame * const frame)
 {
-  m_currentFrame = frame;
+    if (frame != m_currentFrame) {
+        qDebug() << "WebPage - changeCurrentFrame" << "from" << m_currentFrame->frameName() << "to" << frame->frameName();
+        m_currentFrame = frame;
+    }
 }
 
 bool WebPage::switchToFrame(const QString &frameName)
 {
-    foreach(QWebFrame * f, m_currentFrame->childFrames()) {
-        if (f->frameName() == frameName) {
-            this->changeCurrentFrame(f);
+    QList<QWebFrame *> childFrames = m_currentFrame->childFrames();
+    for (int i = childFrames.length() -1; i >= 0; --i) {
+        if (childFrames.at(i)->frameName() == frameName) {
+            this->changeCurrentFrame(childFrames.at(i));
             return true;
         }
     }
@@ -1359,7 +1649,9 @@ bool WebPage::switchToChildFrame(const int framePosition) //< deprecated
 
 void WebPage::switchToMainFrame()
 {
-    this->changeCurrentFrame(m_mainFrame);
+    if (m_currentFrame != m_mainFrame) {
+        this->changeCurrentFrame(m_mainFrame);
+    }
 }
 
 bool WebPage::switchToParentFrame()
@@ -1391,25 +1683,22 @@ QString WebPage::focusedFrameName() const
     return m_customWebPage->currentFrame()->frameName();
 }
 
-static void injectCallbacksObjIntoFrames(QWebFrame *frame, WebpageCallbacks *callbacksObject)
+static void injectCallbacksObjIntoFrame(QWebFrame *frame, WebpageCallbacks *callbacksObject)
 {
-    // Decorate the window object in this frame
-    frame->addToJavaScriptWindowObject(CALLBACKS_OBJECT_NAME, callbacksObject, QScriptEngine::QtOwnership);
-    frame->evaluateJavaScript(CALLBACKS_OBJECT_INJECTION);
-
-    // Decorate the window object in the child frames (recursively)
-    foreach (QWebFrame *childFrame, frame->childFrames()) {
-        injectCallbacksObjIntoFrames(childFrame, callbacksObject);
+    // Inject object only if it's not already present
+    if (frame->evaluateJavaScript(CALLBACKS_OBJECT_PRESENT).toBool() == false) {
+        // Decorate the window object in this frame (object ownership left to the creator/parent)
+        frame->addToJavaScriptWindowObject(CALLBACKS_OBJECT_NAME, callbacksObject, QScriptEngine::QtOwnership);
+        frame->evaluateJavaScript(CALLBACKS_OBJECT_INJECTION);
     }
 }
 
-void WebPage::handleJavaScriptWindowObjectCleared()
+void WebPage::setupFrame(QWebFrame *frame)
 {
-    // Create Callbacks Holder object, if not already present for this page
-    if (!m_callbacks) {
-        m_callbacks = new WebpageCallbacks(this);
-    }
+    qDebug() << "WebPage - setupFrame" << (frame == NULL ? "" : frame->frameName());
 
+    // Inject the Callbacks object in the main frame
+    injectCallbacksObjIntoFrame(frame == NULL ? m_mainFrame : frame, m_callbacks);
     // Reset focus on the Main Frame
     m_mainFrame->setFocus();
 
@@ -1469,6 +1758,12 @@ void WebPage::initCompletions()
     addCompletion("onError");
     addCompletion("onPageCreated");
     addCompletion("onClosing");
+}
+
+void WebPage::updateLoadingProgress(int progress)
+{
+    qDebug() << "WebPage - updateLoadingProgress:" << progress;
+    m_loadingProgress = progress;
 }
 
 #include "webpage.moc"

@@ -6,6 +6,7 @@ CONFIG += console
 DESTDIR = ../bin
 
 RESOURCES = phantomjs.qrc \
+    ghostdriver/ghostdriver.qrc \
     qt/src/3rdparty/webkit/Source/WebCore/inspector/front-end/WebKit.qrc \
     qt/src/3rdparty/webkit/Source/WebCore/generated/InspectorBackendStub.qrc
 
@@ -27,8 +28,8 @@ HEADERS += csconverter.h \
     terminal.h \
     encoding.h \
     config.h \
-    repl.h \
-    replcompletable.h
+    childprocess.h \
+    repl.h
 
 SOURCES += phantom.cpp \
     callback.cpp \
@@ -47,8 +48,8 @@ SOURCES += phantom.cpp \
     terminal.cpp \
     encoding.cpp \
     config.cpp \
-    repl.cpp \
-    replcompletable.cpp
+    childprocess.cpp \
+    repl.cpp
 
 OTHER_FILES += \
     bootstrap.js \
@@ -56,6 +57,7 @@ OTHER_FILES += \
     modules/fs.js \
     modules/webpage.js \
     modules/webserver.js \
+    modules/child_process.js \
     repl.js
 
 include(gif/gif.pri)
@@ -70,6 +72,12 @@ linux*|mac {
       breakpad/src/common/convert_UTF.c \
       breakpad/src/common/md5.cc \
       breakpad/src/common/string_conversion.cc 
+
+    QTPLUGIN += \
+        qcncodecs \
+        qjpcodecs \
+        qkrcodecs \
+        qtwcodecs
 }
 
 linux* {

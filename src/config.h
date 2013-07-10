@@ -38,7 +38,7 @@
 
 class QCommandLine;
 
-class Config: QObject
+class Config: public QObject
 {
     Q_OBJECT
     Q_PROPERTY(QString cookiesFile READ cookiesFile WRITE setCookiesFile)
@@ -57,6 +57,12 @@ class Config: QObject
     Q_PROPERTY(bool printDebugMessages READ printDebugMessages WRITE setPrintDebugMessages)
     Q_PROPERTY(bool javascriptCanOpenWindows READ javascriptCanOpenWindows WRITE setJavascriptCanOpenWindows)
     Q_PROPERTY(bool javascriptCanCloseWindows READ javascriptCanCloseWindows WRITE setJavascriptCanCloseWindows)
+    Q_PROPERTY(QString sslProtocol READ sslProtocol WRITE setSslProtocol)
+    Q_PROPERTY(QString sslCertificatesPath READ sslCertificatesPath WRITE setSslCertificatesPath)
+    Q_PROPERTY(QString webdriver READ webdriver WRITE setWebdriver)
+    Q_PROPERTY(QString webdriverLogFile READ webdriverLogFile WRITE setWebdriverLogFile)
+    Q_PROPERTY(QString webdriverLogLevel READ webdriverLogLevel WRITE setWebdriverLogLevel)
+    Q_PROPERTY(QString webdriverSeleniumGridHub READ webdriverSeleniumGridHub WRITE setWebdriverSeleniumGridHub)
 
 public:
     Config(QObject *parent = 0);
@@ -148,6 +154,25 @@ public:
     void setJavascriptCanCloseWindows(const bool value);
     bool javascriptCanCloseWindows() const;
 
+    void setSslProtocol(const QString& sslProtocolName);
+    QString sslProtocol() const;
+
+    void setSslCertificatesPath(const QString& sslCertificatesPath);
+    QString sslCertificatesPath() const;
+
+    void setWebdriver(const QString& webdriverConfig);
+    QString webdriver() const;
+    bool isWebdriverMode() const;
+
+    void setWebdriverLogFile(const QString& webdriverLogFile);
+    QString webdriverLogFile() const;
+
+    void setWebdriverLogLevel(const QString& webdriverLogLevel);
+    QString webdriverLogLevel() const;
+
+    void setWebdriverSeleniumGridHub(const QString& hubUrl);
+    QString webdriverSeleniumGridHub() const;
+
 public slots:
     void handleSwitch(const QString &sw);
     void handleOption(const QString &option, const QVariant &value);
@@ -191,6 +216,13 @@ private:
     bool m_printDebugMessages;
     bool m_javascriptCanOpenWindows;
     bool m_javascriptCanCloseWindows;
+    QString m_sslProtocol;
+    QString m_sslCertificatesPath;
+    QString m_webdriverIp;
+    QString m_webdriverPort;
+    QString m_webdriverLogFile;
+    QString m_webdriverLogLevel;
+    QString m_webdriverSeleniumGridHub;
 };
 
 #endif // CONFIG_H

@@ -47,10 +47,8 @@ using namespace std;
 
 #include <QApplication>
 #include <QThread>
+#include <QSslSocket>
 
-#ifdef Q_OS_WIN32
-using namespace google_breakpad;
-static google_breakpad::ExceptionHandler* eh;
 #if !defined(QT_SHARED) && !defined(QT_DLL)
 #include <QtPlugin>
 
@@ -58,11 +56,17 @@ Q_IMPORT_PLUGIN(qcncodecs)
 Q_IMPORT_PLUGIN(qjpcodecs)
 Q_IMPORT_PLUGIN(qkrcodecs)
 Q_IMPORT_PLUGIN(qtwcodecs)
+#endif
+
+#ifdef Q_OS_WIN32
+using namespace google_breakpad;
+static google_breakpad::ExceptionHandler* eh;
+#if !defined(QT_SHARED) && !defined(QT_DLL)
 Q_IMPORT_PLUGIN(qico)
 #endif
 #endif
 
-#if QT_VERSION != QT_VERSION_CHECK(4, 8, 2)
+#if QT_VERSION != QT_VERSION_CHECK(4, 8, 4)
 #error Something is wrong with the setup. Please report to the mailing list!
 #endif
 
@@ -162,6 +166,15 @@ int main(int argc, char** argv, const char** envp)
     socketServer->setup(main);
     thread->start();
     QMetaObject::invokeMethod(socketServer, "doWork", Qt::QueuedConnection);
+#if defined(Q_OS_LINUX)
+    if (QSslSocket::supportsSsl()) {
+        // Don't perform on-demand loading of root certificates on Linux
+        QSslSocket::addDefaultCaCertificates(QSslSocket::systemCaCertificates());
+    }
+#endif
+
+    // Get the Phantom singleton
+    // TODO: disabled    Phantom *phantom = Phantom::instance();
 
     app.exec();
 

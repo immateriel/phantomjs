@@ -2,6 +2,7 @@
   This file is part of the PhantomJS project from Ofi Labs.
 
   Copyright (C) 2012 execjosh, http://execjosh.blogspot.com
+  Copyright (C) 2012 James M. Greene <james.m.greene@gmail.com>
 
   Redistribution and use in source and binary forms, with or without
   modification, are permitted provided that the following conditions are met:
@@ -29,14 +30,20 @@
 
 #include "system.h"
 
+#include <QApplication>
 #include <QSslSocket>
 #include <QSysInfo>
 #include <QVariantMap>
+#include <QTextCodec>
 
 #include "../env.h"
+#include "terminal.h"
 
 System::System(QObject *parent) :
-    REPLCompletable(parent)
+    QObject(parent)
+  , m_stdout((File *)NULL)
+  , m_stderr((File *)NULL)
+  , m_stdin((File *)NULL)
 {
     // Populate "env"
     m_env = Env::instance()->asVariantMap();
@@ -118,6 +125,30 @@ System::System(QObject *parent) :
     m_os.insert("name", "unknown");
     m_os.insert("version", "unknown");
 #endif
+
+    connect(Terminal::instance(), SIGNAL(encodingChanged(QString)), this, SLOT(_onTerminalEncodingChanged(QString)));
+}
+
+System::~System()
+{
+    // Clean-up standard streams
+    if ((File *)NULL != m_stdout) {
+        delete m_stdout;
+        m_stdout = (File *)NULL;
+    }
+    if ((File *)NULL != m_stderr) {
+        delete m_stderr;
+        m_stderr = (File *)NULL;
+    }
+    if ((File *)NULL != m_stdin) {
+        delete m_stdin;
+        m_stdin = (File *)NULL;
+    }
+}
+
+qint64 System::pid() const
+{
+    return QApplication::applicationPid();
 }
 
 void System::setArgs(const QStringList &args)
@@ -145,11 +176,59 @@ bool System::isSSLSupported() const
     return QSslSocket::supportsSsl();
 }
 
-void System::initCompletions()
+QObject *System::_stdout() {
+    if ((File *)NULL == m_stdout) {
+        QFile *f = new QFile();
+        f->open(stdout, QIODevice::WriteOnly | QIODevice::Unbuffered);
+        m_stdout = createFileInstance(f);
+    }
+
+    return m_stdout;
+}
+
+QObject *System::_stderr() {
+    if ((File *)NULL == m_stderr) {
+        QFile *f = new QFile();
+        f->open(stderr, QIODevice::WriteOnly | QIODevice::Unbuffered);
+        m_stderr = createFileInstance(f);
+    }
+
+    return m_stderr;
+}
+
+QObject *System::_stdin() {
+    if ((File *)NULL == m_stdin) {
+        QFile *f = new QFile();
+        f->open(stdin, QIODevice::ReadOnly | QIODevice::Unbuffered);
+        m_stdin = createFileInstance(f);
+    }
+
+    return m_stdin;
+}
+
+// private slots:
+
+void System::_onTerminalEncodingChanged(const QString &encoding)
 {
-    addCompletion("args");
-    addCompletion("env");
-    addCompletion("platform");
-    addCompletion("os");
-    addCompletion("isSSLSupported");
+    if ((File *)NULL != m_stdin) {
+        m_stdin->setEncoding(encoding);
+    }
+
+    if ((File *)NULL != m_stdout) {
+        m_stdout->setEncoding(encoding);
+    }
+
+    if ((File *)NULL != m_stderr) {
+        m_stderr->setEncoding(encoding);
+    }
+}
+
+// private:
+
+File *System::createFileInstance(QFile *f)
+{
+    // Get the Encoding used by the Terminal at this point in time
+    Encoding e(Terminal::instance()->getEncoding());
+    QTextCodec *codec = e.getCodec();
+    return new File(f, codec, this);
 }
