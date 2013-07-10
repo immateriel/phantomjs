@@ -482,7 +482,6 @@ signals:
 
 private slots:
     void finish(bool ok);
-    void handleJavaScriptWindowObjectCleared();
     void handleUnsupportedContent(QNetworkReply *reply);
     void setupFrame(QWebFrame *frame = NULL);
     void updateLoadingProgress(int progress);

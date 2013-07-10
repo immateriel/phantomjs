@@ -256,9 +256,9 @@ function decorateNewPage(opts, page) {
 
     definePageSignalHandler(page, handlers, "onResourceTimeout", "resourceTimeout");
 
-    definePageSignalSetter(page, handlers, "onUnsupportedContentReceived", "unsupportedContentReceived");
+    definePageSignalHandler(page, handlers, "onUnsupportedContentReceived", "unsupportedContentReceived");
 
-    definePageSignalSetter(page, handlers, "onAlert", "javaScriptAlertSent");
+    definePageSignalHandler(page, handlers, "onAlert", "javaScriptAlertSent");
 
     definePageSignalHandler(page, handlers, "onConsoleMessage", "javaScriptConsoleMessageSent");
 
