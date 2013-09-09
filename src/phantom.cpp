@@ -75,7 +75,7 @@ Phantom::Phantom(QObject *parent)
     , m_childprocess(0)
 {
     QStringList args = QApplication::arguments();
-
+	
     // Prepare the configuration object based on the command line arguments.
     // Because this object will be used by other classes, it needs to be ready ASAP.
     m_config.init(&args);
@@ -112,9 +112,9 @@ void Phantom::init()
     }
 
     // Initialize the CookieJar
-    CookieJar::instance(m_config.cookiesFile());
+	m_cookieJar=new CookieJar(m_config.cookiesFile(),this);
 
-    m_page = new WebPage(this, QUrl::fromLocalFile(m_config.scriptFile()));
+    m_page = new WebPage(this, QUrl::fromLocalFile(m_config.scriptFile()),m_cookieJar);
     m_pages.append(m_page);
 
     QString proxyType = m_config.proxyType();
@@ -176,6 +176,7 @@ Phantom *Phantom::instance() {
 
 Phantom::~Phantom()
 {
+//		cout << "Phantom: delete" << endl;
     // Nothing to do: cleanup is handled by QObject relationships
 }
 
@@ -299,15 +300,15 @@ bool Phantom::printDebugMessages() const
 
 bool Phantom::areCookiesEnabled() const
 {
-    return CookieJar::instance()->isEnabled();
+	    return m_cookieJar->isEnabled();
 }
 
 void Phantom::setCookiesEnabled(const bool value)
 {
     if (value) {
-        CookieJar::instance()->enable();
+		m_cookieJar->enable();
     } else {
-        CookieJar::instance()->disable();
+		m_cookieJar->disable();
     }
 }
 
@@ -319,7 +320,7 @@ bool Phantom::webdriverMode() const
 // public slots:
 QObject *Phantom::createWebPage()
 {
-    WebPage *page = new WebPage(this);
+    WebPage *page = new WebPage(this,QUrl(),m_cookieJar);
 
     // Store pointer to the page for later cleanup
     m_pages.append(page);
@@ -460,33 +461,36 @@ void Phantom::onInitialized()
 bool Phantom::setCookies(const QVariantList &cookies)
 {
     // Delete all the cookies from the CookieJar
-    CookieJar::instance()->clearCookies();
+    m_cookieJar->clearCookies();
+	
     // Add a new set of cookies
-    return CookieJar::instance()->addCookiesFromMap(cookies);
+    return m_cookieJar->addCookiesFromMap(cookies);
 }
 
 QVariantList Phantom::cookies() const
 {
     // Return all the Cookies in the CookieJar, as a list of Maps (aka JSON in JS space)
-    return CookieJar::instance()->cookiesToMap();
+	    return m_cookieJar->cookiesToMap();
 }
 
 bool Phantom::addCookie(const QVariantMap &cookie)
 {
-    return CookieJar::instance()->addCookieFromMap(cookie);
+    return m_cookieJar->addCookieFromMap(cookie);
+	
 }
 
 bool Phantom::deleteCookie(const QString &cookieName)
 {
     if (!cookieName.isEmpty()) {
-        return CookieJar::instance()->deleteCookie(cookieName);
+		        return m_cookieJar->deleteCookie(cookieName);
     }
     return false;
 }
 
 void Phantom::clearCookies()
 {
-    CookieJar::instance()->clearCookies();
+	cout << "Phantom: clear CookieJar" << endl;
+	m_cookieJar->clearCookies();
 }
 
 

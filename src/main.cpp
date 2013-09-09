@@ -112,6 +112,8 @@ void Main::deletePhantomJSInstance(quint64 threadId)
 {
 //  cout << "Main: deletePhantomJSInstance() for threadId " << threadId << endl;
   Phantom *phantom = phantomInstancesMap[threadId];
+//  phantom->clearCookies();
+
   phantomInstancesMap.remove(threadId);
   delete phantom;
 }

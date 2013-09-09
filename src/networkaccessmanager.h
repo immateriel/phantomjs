@@ -71,7 +71,7 @@ class NetworkAccessManager : public QNetworkAccessManager
 {
     Q_OBJECT
 public:
-    NetworkAccessManager(QObject *parent, const Config *config);
+    NetworkAccessManager(QObject *parent, const Config *config, QNetworkCookieJar *cookieJar = NULL);
     void setUserName(const QString &userName);
     void setPassword(const QString &password);
     void setMaxAuthAttempts(int maxAttempts);

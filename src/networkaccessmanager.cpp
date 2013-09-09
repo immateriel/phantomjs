@@ -38,6 +38,10 @@
 #include <QSslCertificate>
 #include <QRegExp>
 
+#include <iostream>
+using namespace std;
+#include <unistd.h>
+
 #include "phantom.h"
 #include "config.h"
 #include "cookiejar.h"
@@ -110,7 +114,7 @@ void JsNetworkRequest::changeUrl(const QString& address)
 }
 
 // public:
-NetworkAccessManager::NetworkAccessManager(QObject *parent, const Config *config)
+NetworkAccessManager::NetworkAccessManager(QObject *parent, const Config *config, QNetworkCookieJar *cookieJar)
     : QNetworkAccessManager(parent)
     , m_ignoreSslErrors(config->ignoreSslErrors())
     , m_authAttempts(0)
@@ -121,10 +125,14 @@ NetworkAccessManager::NetworkAccessManager(QObject *parent, const Config *config
     , m_sslConfiguration(QSslConfiguration::defaultConfiguration())
 {
 	
-//	CookieJar *tmpCookieJar=CookieJar::instance();
-//	tmpCookieJar->setParent(parent);
-//	setCookieJar(tmpCookieJar);
-	setCookieJar(CookieJar::instance());
+	if (cookieJar) {
+//		cout << "NetworkAccessManager: set cookieJar" << endl;
+		setCookieJar(cookieJar);
+	} else {
+		cookieJar=CookieJar::instance();
+		cookieJar->setParent(Phantom::instance());
+		setCookieJar(cookieJar);		
+	}
 
     if (config->diskCacheEnabled()) {
         m_networkDiskCache = new QNetworkDiskCache(this);
@@ -202,7 +210,6 @@ void NetworkAccessManager::setCookieJar(QNetworkCookieJar *cookieJar)
     // pass it to the PhantomJS Singleton object.
     // CookieJar is a SINGLETON, shouldn't be deleted when
     // the NetworkAccessManager is deleted but only when we shutdown.
-	cookieJar->setParent(Phantom::instance());
 }
 
 // protected:

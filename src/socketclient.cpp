@@ -55,10 +55,10 @@ void SocketClient::setup(Main *main, SocketServer *socketServer)
   this->phantom->socketClient = this;
   this->webpage = phantom->m_page;
   
-//  CookieJar *cookieJar=CookieJar::instance();
+//    CookieJar *cookieJar=CookieJar::create(this->phantom);
 //  cookieJar->setParent(this->phantom);
 //  cout << "SocketClient[" << threadId << "]: set CookieJar" << endl;
-//  this->webpage->m_networkAccessManager->setCookieJar(cookieJar);
+//	this->webpage->m_networkAccessManager->setCookieJar(cookieJar);
 //  this->webpage->m_networkAccessManager->cookieJar->setParent(this->phantom());
   
 #ifdef SOCKET_CLIENT_DEBUG
@@ -110,7 +110,6 @@ void SocketClient::client_disconnected()
     {
       client_socket->close();
     }
-
 
   QMetaObject::invokeMethod(main, "deletePhantomJSInstance", Qt::QueuedConnection, Q_ARG(quint64, threadId));
 

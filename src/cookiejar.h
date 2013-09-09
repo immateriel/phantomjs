@@ -35,16 +35,19 @@
 #include <QNetworkCookieJar>
 #include <QVariantList>
 #include <QVariantMap>
+#include <QUuid>
 
 class CookieJar: public QNetworkCookieJar
 {
     Q_OBJECT
 
-private:
-    CookieJar(QString cookiesFile, QObject *parent = NULL);
+		//private:
 
 public:
     static CookieJar *instance(QString cookiesFile = QString());
+    static CookieJar *create(QString cookiesFile = QString(),QObject *parent=NULL);
+
+    CookieJar(QString cookiesFile, QObject *parent = NULL);
     virtual ~CookieJar();
 
     bool setCookiesFromUrl(const QList<QNetworkCookie> &cookieList, const QUrl & url);
@@ -81,6 +84,7 @@ private:
 private:
     QSettings *m_cookieStorage;
     bool m_enabled;
+	QUuid uuid;
 };
 
 #endif // COOKIEJAR_H

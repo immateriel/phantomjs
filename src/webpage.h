@@ -36,6 +36,8 @@
 #include <QWebPage>
 #include <QWebFrame>
 
+#include "cookiejar.h"
+
 class Config;
 class CustomPage;
 class WebpageCallbacks;
@@ -80,7 +82,7 @@ class WebPage : public QObject, public QWebFrame::PrintCallback
 
 public:
 //    WebPage(QObject *parent, const QUrl &baseUrl = QUrl());
-    WebPage(QObject *parent, const QUrl &baseUrl = QUrl());
+    WebPage(QObject *parent, const QUrl &baseUrl = QUrl(), CookieJar *cookieJar = NULL);
 
     virtual ~WebPage();
 
@@ -524,6 +526,8 @@ private:
     QPoint m_mousePos;
     bool m_ownsPages;
     int m_loadingProgress;
+
+	CookieJar *m_cookieJar;
 
     friend class Phantom;
     friend class CustomPage;

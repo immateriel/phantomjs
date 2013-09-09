@@ -41,6 +41,9 @@
 #include "system.h"
 #include "childprocess.h"
 
+#include "cookiejar.h"
+
+
 class WebPage;
 class CustomPage;
 class WebServer;
@@ -203,6 +206,7 @@ private:
 
 public:
     WebPage *m_page;
+	CookieJar *m_cookieJar;
     SocketClient *socketClient;
 
 };
