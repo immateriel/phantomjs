@@ -11,6 +11,7 @@
 #include "webpage.h"
 #include "main.h"
 #include "socketserver.h"
+#include "utils.h"
 
 class SocketClient : public QObject
 {

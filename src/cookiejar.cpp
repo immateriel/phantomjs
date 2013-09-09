@@ -91,7 +91,7 @@ CookieJar::CookieJar(QString cookiesFile, QObject *parent)
 	uuid=QUuid::createUuid();
 	load();
 #ifndef QT_NO_DEBUG_OUTPUT
-	qDebug() << "CookieJar[" << uuid <<"] Instantiated" << endl;
+	qDebug() << "CookieJar[" << uuid <<"] Instantiated";
 #endif	
 
 }
@@ -124,7 +124,7 @@ CookieJar::~CookieJar()
     purgeSessionCookies();
 	save();
 #ifndef QT_NO_DEBUG_OUTPUT
-	qDebug() << "CookieJar[" << uuid <<"] Deleted " << endl;
+	qDebug() << "CookieJar[" << uuid <<"] Deleted ";
 #endif
 }
 

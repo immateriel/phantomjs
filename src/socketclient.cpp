@@ -15,7 +15,6 @@ using namespace std;
 #include "phantom.h"
 #include "cookiejar.h"
 #include "networkaccessmanager.h"
-
 #include "main.h"
 
 /*
@@ -62,7 +61,7 @@ void SocketClient::setup(Main *main, SocketServer *socketServer)
 //  this->webpage->m_networkAccessManager->cookieJar->setParent(this->phantom());
   
 #ifdef SOCKET_CLIENT_DEBUG
-  cout << "SocketClient[" << threadId << "]: setup" << endl;
+  qDebug() << "SocketClient[" << threadId << "]: setup";
 #endif
 
   QTextCodec::setCodecForCStrings(QTextCodec::codecForName("UTF8"));
@@ -79,7 +78,7 @@ void SocketClient::setup(Main *main, SocketServer *socketServer)
 void SocketClient::sendConsoleMessage(const QString &message)
 {
 #ifdef SOCKET_CLIENT_DEBUG
-  cout << "SocketClient[" << threadId << "]: send response « " << message.toUtf8().data() << " »" << endl;
+  qDebug() << "SocketClient[" << threadId << "]: send response « " << message.toUtf8().data() << " »";
 #endif
 
   if (client_socket != NULL)
@@ -92,7 +91,8 @@ void SocketClient::sendConsoleMessage(const QString &message)
 void SocketClient::copyJsConsoleMessageToClientSocket(const QString &message)
 {
 #ifdef SOCKET_CLIENT_DEBUG
-  cout << "SocketClient[" << threadId << "]: message sent 2" << endl; //'" << message.toUtf8().data() << "'" << endl;
+  qDebug() << "SocketClient[" << threadId << "]: message sent 2";
+  // message.toUtf8().data() << "'" << endl;
 #endif
 
   if (client_socket != NULL)
@@ -105,7 +105,7 @@ void SocketClient::copyJsConsoleMessageToClientSocket(const QString &message)
 
 void SocketClient::client_disconnected()
 {
-  cout << "SocketClient[" << threadId << "]: client disconnected" << endl;
+  qDebug() << "SocketClient[" << threadId << "]: client disconnected";
   if (client_socket != NULL)
     {
       client_socket->close();
@@ -119,7 +119,7 @@ void SocketClient::client_disconnected()
 void SocketClient::doWork()
 {
 #ifdef SOCKET_CLIENT_DEBUG
-  cout << "SocketClient[" << threadId << "]: do work" << endl;
+  qDebug() << "SocketClient[" << threadId << "]: do work";
 #endif
   
   /* Read all data till all the input is read */
@@ -135,7 +135,7 @@ void SocketClient::doWork()
   while (client_socket != NULL)
     {
 #ifdef SOCKET_CLIENT_DEBUG
-      cout << "SocketClient[" << threadId << "]: waiting for a new request of the client" << endl;
+      qDebug() << "SocketClient[" << threadId << "]: waiting for a new request of the client";
 #endif
 
       /* First read the header which consists in a line of text 
@@ -175,7 +175,7 @@ void SocketClient::doWork()
 	    }
 
 #ifdef SOCKET_CLIENT_DEBUG
-	  cout << "SocketClient[" << threadId << "]: still waiting" << endl;
+	  qDebug() << "SocketClient[" << threadId << "]: still waiting";
 #endif
 
 	  // if (status_read == 0 && !client_socket->waitForReadyRead())
@@ -191,7 +191,7 @@ void SocketClient::doWork()
 		{
 #ifdef SOCKET_CLIENT_DEBUG
 //		  cout << "SocketClient[" << threadId << "]: !client_socket->waitForReadyRead())" << endl;
-		  cout << "SocketClient[" << threadId << "]: still waiting" << endl;
+		  qDebug() << "SocketClient[" << threadId << "]: still waiting";
 #endif
 		  // break;
 		  //		  this->thread::msleep(100);
@@ -209,7 +209,7 @@ void SocketClient::doWork()
 	  if (!client_ready)
 	    {
 #ifdef SOCKET_CLIENT_DEBUG
-	      cout << "SocketClient[" << threadId << "]: wait for too long, aborting" << endl;
+	      qDebug() << "SocketClient[" << threadId << "]: wait for too long, aborting";
 #endif
 	      break;
 	    }
@@ -250,7 +250,7 @@ void SocketClient::doWork()
 	}
       else
 	{
-	  cerr << "SocketClient[" << threadId << "]: no header found" << endl;
+	  qDebug() << "SocketClient[" << threadId << "]: no header found";
 //	  cerr << "SocketClient[" << threadId << "]: incorrect header_data : «" << request_data.data() << "» " << endl;
 	  client_disconnected();
 	  return;
@@ -281,10 +281,10 @@ void SocketClient::doWork()
 	    break;
 	}
 #ifdef SOCKET_CLIENT_DEBUG
-      cout << "SocketClient[" << threadId << "]: whole request read « " << request_data.data() << " »" << endl;
+      qDebug() << "SocketClient[" << threadId << "]: whole request read « " << request_data.data() << " »";
 #endif
 // , it is:«" << request_data.data () << "» " << endl;
-	  cout << "SocketClient[" << threadId << "]: evaluate javascript" << endl;
+	  qDebug() << "SocketClient[" << threadId << "]: evaluate javascript";
 //      cout << "et en invokant? " << endl;
       QMetaObject::invokeMethod(webpage->mainFrame(), "evaluateJavaScript", Qt::QueuedConnection, Q_ARG(QString, QString(request_data.data())) );
 
@@ -292,7 +292,7 @@ void SocketClient::doWork()
       request_length = 0;
 
 #ifdef SOCKET_CLIENT_DEBUG
-      cout << "SocketClient[" << threadId << "]: work done" << endl;
+      qDebug() << "SocketClient[" << threadId << "]: work done";
 #endif
 	      
     }

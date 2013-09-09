@@ -17,6 +17,7 @@ using namespace std;
 #include "phantom.h"
 #include "webpage.h"
 #include "main.h"
+#include "utils.h"
 
 /*
 Protocol:
@@ -30,6 +31,8 @@ needs to be executed.
 
 SocketServer::SocketServer(QObject *parent)
 {
+    Utils::printDebugMessages = true;
+
 }
 
 SocketServer::~SocketServer()
@@ -48,13 +51,13 @@ void SocketServer::sendConsoleMessage(const QString &message)
 
 void SocketServer::doWork()
 {
-  cout << "SocketServer: listening for connection" << endl;
+  qDebug() << "SocketServer: listening for connection";
 
   QTcpServer server;
   bool status = server.listen(QHostAddress::Any, 12000);
   if (!status)
     {
-      cerr << "SocketServer: can't open TCP Server." << endl;
+      qDebug() << "SocketServer: can't open TCP Server.";
       exit(1);
     }
 
@@ -64,11 +67,11 @@ void SocketServer::doWork()
       status = server.waitForNewConnection(-1);
       if (status)
 	{
-	  cout << "SocketServer: new connection available" << endl;
+	  qDebug() << "SocketServer: new connection available";
 	  client_socket = server.nextPendingConnection();
 	  if (client_socket == NULL)
 	    {
-	      cout << "SocketServer: client socket is NULL" << endl;
+	      qDebug() << "SocketServer: client socket is NULL";
 	    }
 	  else
 	    {
@@ -92,7 +95,7 @@ void SocketServer::doWork()
 	}
       else
 	{
-	  cout << "SocketServer: problem waiting for a new connection" << endl;
+	  qDebug() << "SocketServer: problem waiting for a new connection";
 	}
 
     }

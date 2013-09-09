@@ -82,7 +82,7 @@ Phantom::Phantom(QObject *parent)
     // Apply debug configuration as early as possible
     Utils::printDebugMessages = m_config.printDebugMessages();
     // TODO: take that off
-    Utils::printDebugMessages = false;
+    Utils::printDebugMessages = true;
 }
 
 void Phantom::init()
@@ -489,7 +489,7 @@ bool Phantom::deleteCookie(const QString &cookieName)
 
 void Phantom::clearCookies()
 {
-	cout << "Phantom: clear CookieJar" << endl;
+//	cout << "Phantom: clear CookieJar" << endl;
 	m_cookieJar->clearCookies();
 }
 
