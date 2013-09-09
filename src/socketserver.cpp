@@ -48,13 +48,13 @@ void SocketServer::sendConsoleMessage(const QString &message)
 
 void SocketServer::doWork()
 {
-  cout << "SocketServer: doWork" << endl;
+  cout << "SocketServer: listening for connection" << endl;
 
   QTcpServer server;
   bool status = server.listen(QHostAddress::Any, 12000);
   if (!status)
     {
-      cerr << "SocketServer: Can't open TCP Server." << endl;
+      cerr << "SocketServer: can't open TCP Server." << endl;
       exit(1);
     }
 
@@ -64,11 +64,11 @@ void SocketServer::doWork()
       status = server.waitForNewConnection(-1);
       if (status)
 	{
-	  cout << "SocketServer: New connection available." << endl;
+	  cout << "SocketServer: new connection available" << endl;
 	  client_socket = server.nextPendingConnection();
 	  if (client_socket == NULL)
 	    {
-	      cout << "WARNING: client socket is NULL." << endl;
+	      cout << "SocketServer: client socket is NULL" << endl;
 	    }
 	  else
 	    {
@@ -92,7 +92,7 @@ void SocketServer::doWork()
 	}
       else
 	{
-	  cout << "SocketServer: Problem waiting for a new connection." << endl;
+	  cout << "SocketServer: problem waiting for a new connection" << endl;
 	}
 
     }
@@ -100,7 +100,7 @@ void SocketServer::doWork()
 
 void SocketServer::deleteThreadInstance(quint64 threadId)
 {
-  cout << "SocketServer: deleteThreadInstance() for threadId" << threadId << endl;
+//  cout << "SocketServer: deleteThreadInstance() for threadId " << threadId << endl;
   QThread *thread = threadInstancesMap[threadId];
   threadInstancesMap.remove(threadId);
   thread->quit();

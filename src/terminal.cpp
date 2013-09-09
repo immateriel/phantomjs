@@ -84,8 +84,9 @@ bool Terminal::setEncoding(const QString &encoding)
 }
 
 void Terminal::cout(const QString &string, const bool newline) const
-{
-    output(std::cout, string, newline);
+{ 
+ // julien: on ne veut pas cette sortie
+ //   output(std::cout, string, newline);
 }
 
 void Terminal::cerr(const QString &string, const bool newline) const

@@ -120,7 +120,11 @@ NetworkAccessManager::NetworkAccessManager(QObject *parent, const Config *config
     , m_networkDiskCache(0)
     , m_sslConfiguration(QSslConfiguration::defaultConfiguration())
 {
-    setCookieJar(CookieJar::instance());
+	
+//	CookieJar *tmpCookieJar=CookieJar::instance();
+//	tmpCookieJar->setParent(parent);
+//	setCookieJar(tmpCookieJar);
+	setCookieJar(CookieJar::instance());
 
     if (config->diskCacheEnabled()) {
         m_networkDiskCache = new QNetworkDiskCache(this);
@@ -192,12 +196,13 @@ QVariantMap NetworkAccessManager::customHeaders() const
 
 void NetworkAccessManager::setCookieJar(QNetworkCookieJar *cookieJar)
 {
+//	qWarning() << "NetworkAccessManager: set CookieJar ";
     QNetworkAccessManager::setCookieJar(cookieJar);
     // Remove NetworkAccessManager's ownership of this CookieJar and
     // pass it to the PhantomJS Singleton object.
     // CookieJar is a SINGLETON, shouldn't be deleted when
     // the NetworkAccessManager is deleted but only when we shutdown.
-    cookieJar->setParent(Phantom::instance());
+	cookieJar->setParent(Phantom::instance());
 }
 
 // protected:

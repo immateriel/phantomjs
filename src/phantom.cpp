@@ -82,7 +82,7 @@ Phantom::Phantom(QObject *parent)
     // Apply debug configuration as early as possible
     Utils::printDebugMessages = m_config.printDebugMessages();
     // TODO: take that off
-    Utils::printDebugMessages = true;
+    Utils::printDebugMessages = false;
 }
 
 void Phantom::init()
@@ -412,6 +412,8 @@ bool Phantom::injectJs(const QString &jsFilePath)
 
 void Phantom::exit(int code)
 {
+    cout << "Phantom: exiting" << endl;
+	
     if (m_config.debug()) {
         Terminal::instance()->cout("Phantom::exit() called but not quitting in debug mode.");
     } else {
@@ -420,7 +422,7 @@ void Phantom::exit(int code)
 }
 
 void Phantom::debugExit(int code)
-{
+{    
     doExit(code);
 }
 
@@ -432,7 +434,7 @@ void Phantom::printConsoleMessage(const QString &message)
 
 void Phantom::copyJsConsoleMessageToClientSocket(const QString &message)
 {
-  cout << "Phantom::copyJsConsoleMessageToClientSocket invocated..." << endl;
+//	  cout << "Phantom: copyJsConsoleMessageToClientSocket" << endl;
 
   if (socketClient != NULL)
     {
@@ -443,7 +445,7 @@ void Phantom::copyJsConsoleMessageToClientSocket(const QString &message)
 
 void Phantom::onInitialized()
 {
-    cout << "Phantom onInitialized called" << endl;
+//    cout << "Phantom: onInitialized called" << endl;
     // Add 'phantom' object to the global scope
     m_page->mainFrame()->addToJavaScriptWindowObject("phantom", this);
 
@@ -452,7 +454,7 @@ void Phantom::onInitialized()
                 Utils::readResourceFileUtf8(":/bootstrap.js"),
                 QString("phantomjs://bootstrap.js")
                 );
-    cout << "Phantom onInitialized finished" << endl;
+//    cout << "Phantom: onInitialized finished" << endl;
 }
 
 bool Phantom::setCookies(const QVariantList &cookies)
@@ -490,7 +492,7 @@ void Phantom::clearCookies()
 
 // private:
 void Phantom::doExit(int code)
-{
+{	
     if (m_config.debug())
     {
         Utils::cleanupFromDebug();
@@ -502,5 +504,5 @@ void Phantom::doExit(int code)
     qDeleteAll(m_pages);
     m_pages.clear();
     m_page = 0;
-    QApplication::instance()->exit(code);
+//    QApplication::instance()->exit(code);
 }

@@ -26,6 +26,9 @@
   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
   THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+#include <iostream>
+using namespace std;
+#include <unistd.h>
 
 #include "childprocess.h"
 
@@ -109,6 +112,7 @@ void ChildProcessContext::_finished(const int exitCode, const QProcess::ExitStat
 
 void ChildProcessContext::_error(const QProcess::ProcessError error)
 {
+	
     Q_UNUSED(error)
 
     emit exit(m_proc.exitCode());

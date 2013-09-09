@@ -35,6 +35,9 @@
 #include <QRegExp>
 #include <QMetaMethod>
 #include <QMetaProperty>
+#include <iostream>
+using namespace std;
+#include <unistd.h>
 
 #include "consts.h"
 #include "terminal.h"

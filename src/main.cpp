@@ -91,26 +91,26 @@ Main *Main::instance()
 
 void Main::createPhantomJSInstance(quint64 threadId)
 {
-  cout << "Main: createPhantomJSInstance() for threadId" << threadId << endl;
+//  cout << "Main: createPhantomJSInstance() for threadId " << threadId << endl;
   Phantom *phantom = new Phantom();
   phantom->config()->setWebSecurityEnabled(false);
   phantom->init();
   //  this->phantom = phantom;
   
-  cout << "MMMMMMM CHECK :" << phantom->config()->webSecurityEnabled() << endl;
+//  cout << "MMMMMMM CHECK :" << phantom->config()->webSecurityEnabled() << endl;
   
   phantomInstancesMap[threadId] = phantom;
 }
 
 void Main::addThreadInstance(quint64 threadId, QThread *thread)
 {
-  cout << "LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL MAIN addThreadInstance threadId: " << threadId << endl;
+//  cout << "Main: addThreadInstance threadId: " << threadId << endl;
   threadInstancesMap[threadId] = thread;
 }
 
 void Main::deletePhantomJSInstance(quint64 threadId)
 {
-  cout << "Main: deletePhantomJSInstance() for threadId" << threadId << endl;
+//  cout << "Main: deletePhantomJSInstance() for threadId " << threadId << endl;
   Phantom *phantom = phantomInstancesMap[threadId];
   phantomInstancesMap.remove(threadId);
   delete phantom;
