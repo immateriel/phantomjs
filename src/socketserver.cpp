@@ -82,7 +82,10 @@ void SocketServer::doWork()
 	      SocketClient *socketClient = new SocketClient(thread);
 
 	      quint64 thread_id = (quint64) (void*)socketClient;
+
 	      threadInstancesMap[thread_id] = thread;
+
+	      qDebug() << "SocketServer: add thread instance"<<thread_id<<", total: " << threadInstancesMap.size();
 
 	      socketClient->moveToThread(thread);
 
@@ -103,8 +106,11 @@ void SocketServer::doWork()
 
 void SocketServer::deleteThreadInstance(quint64 threadId)
 {
-//  cout << "SocketServer: deleteThreadInstance() for threadId " << threadId << endl;
+	
   QThread *thread = threadInstancesMap[threadId];
   threadInstancesMap.remove(threadId);
+
+  qDebug() << "SocketServer: delete thread instance"<<threadId<<", total: " << threadInstancesMap.size();
+  	  
   thread->quit();
 }

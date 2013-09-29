@@ -71,7 +71,7 @@ void SocketClient::setup(Main *main, SocketServer *socketServer)
 	  Qt::QueuedConnection);
 
       // Listen for Phantom exit(ing)
-      connect(this->phantom, SIGNAL(aboutToExit(int)), this, SLOT(client_disconnected));
+      connect(this->phantom, SIGNAL(aboutToExit(int)), this, SLOT(client_disconnected(void)));
 
 }
 

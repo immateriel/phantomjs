@@ -176,7 +176,8 @@ Phantom *Phantom::instance() {
 
 Phantom::~Phantom()
 {
-//		cout << "Phantom: delete" << endl;
+//	qDebug() << "Phantom: delete";
+	delete m_cookieJar;
     // Nothing to do: cleanup is handled by QObject relationships
 }
 
