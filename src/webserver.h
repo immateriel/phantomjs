@@ -88,7 +88,7 @@ private:
     QString m_port;
     QMutex m_mutex;
     QList<WebServerResponse*> m_pendingResponses;
-    QAtomicInt m_closing;
+    QAtomicInt m_closing;	
 };
 
 

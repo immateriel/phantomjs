@@ -39,10 +39,12 @@ SocketServer::~SocketServer()
 {
 }
 
-void SocketServer::setup(Main *main)
+void SocketServer::setup(Main *main,const QString &sHost, uint sPort)
 {
   QTextCodec::setCodecForCStrings(QTextCodec::codecForName("UTF8"));
   this->main = main;
+  this->serverHost = sHost;
+  this->serverPort = sPort;
 }
 
 void SocketServer::sendConsoleMessage(const QString &message)
@@ -51,10 +53,11 @@ void SocketServer::sendConsoleMessage(const QString &message)
 
 void SocketServer::doWork()
 {
-  qDebug() << "SocketServer: listening for connection";
+  qDebug() << "SocketServer: listening for connection on"<<this->serverHost<<":"<<this->serverPort;
 
   QTcpServer server;
-  bool status = server.listen(QHostAddress::Any, 12000);
+  bool status = server.listen(QHostAddress(this->serverHost), this->serverPort);
+
   if (!status)
     {
       qDebug() << "SocketServer: can't open TCP Server.";
@@ -77,6 +80,7 @@ void SocketServer::doWork()
 	    {
 	      QThread *thread = new QThread();
 
+//		  client_socket->moveToThread(thread);
 	      thread->start();
 
 	      SocketClient *socketClient = new SocketClient(thread);

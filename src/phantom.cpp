@@ -74,11 +74,11 @@ Phantom::Phantom(QObject *parent)
     , m_system(0)
     , m_childprocess(0)
 {
-    QStringList args = QApplication::arguments();
+//    QStringList args = QApplication::arguments();
 	
     // Prepare the configuration object based on the command line arguments.
     // Because this object will be used by other classes, it needs to be ready ASAP.
-    m_config.init(&args);
+//    m_config.init(&args);
     // Apply debug configuration as early as possible
     Utils::printDebugMessages = m_config.printDebugMessages();
     // TODO: take that off

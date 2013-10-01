@@ -90,8 +90,9 @@ Main *Main::instance()
 }
 
 void Main::createPhantomJSInstance(quint64 threadId)
-{
-//  cout << "Main: createPhantomJSInstance() for threadId " << threadId << endl;
+	{
+		
+	qDebug() << "Main: create phantomjs instance for" << threadId;
   Phantom *phantom = new Phantom();
   phantom->config()->setWebSecurityEnabled(false);
   phantom->init();
@@ -110,6 +111,8 @@ void Main::addThreadInstance(quint64 threadId, QThread *thread)
 
 void Main::deletePhantomJSInstance(quint64 threadId)
 {
+	qDebug() << "Main: delete phantomjs instance from" << threadId;
+	
 //  cout << "Main: deletePhantomJSInstance() for threadId " << threadId << endl;
   Phantom *phantom = phantomInstancesMap[threadId];
 //  phantom->clearCookies();
@@ -155,6 +158,24 @@ int main(int argc, char** argv, const char** envp)
     app.setOrganizationDomain("www.ofilabs.com");
     app.setApplicationVersion(PHANTOMJS_VERSION_STRING);
 
+		 QStringList args = app.arguments();
+QString host = "127.0.0.1"; 
+uint port = 12000;
+
+for (int i = 0; i < args.size(); ++i)
+{
+	if(QString::compare(args[i],"--host") == 0)
+	{
+		host = QString(args[i+1]);
+	}
+	if(QString::compare(args[i],"--port") == 0)
+	{
+		port = args[i+1].toUInt();
+	}
+	
+}
+
+
     // Prepare the "env" singleton using the environment variables
     Env::instance()->parse(envp);
 
@@ -165,7 +186,7 @@ int main(int argc, char** argv, const char** envp)
     SocketServer *socketServer = new SocketServer(main);
     QThread *thread = new QThread();
     socketServer->moveToThread(thread);
-    socketServer->setup(main);
+    socketServer->setup(main, host, port);
     thread->start();
     QMetaObject::invokeMethod(socketServer, "doWork", Qt::QueuedConnection);
 #if defined(Q_OS_LINUX)

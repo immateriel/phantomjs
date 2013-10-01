@@ -40,12 +40,14 @@ void SocketClient::setup(Main *main, SocketServer *socketServer)
   quint64 thread_id = (quint64) (void*)this;
   this->threadId = thread_id;
 
-
   QMetaObject::invokeMethod(main, "createPhantomJSInstance", Qt::QueuedConnection, Q_ARG(quint64, thread_id));
 
   int tmp;
   
   while (!main->phantomInstancesMap.contains(thread_id)){
+#ifdef SOCKET_CLIENT_DEBUG	  
+	qDebug()  << "SocketClient[" << threadId << "]: waiting for phantomjs instance";
+#endif
     sleep(1);
   }
 
@@ -53,13 +55,7 @@ void SocketClient::setup(Main *main, SocketServer *socketServer)
 
   this->phantom->socketClient = this;
   this->webpage = phantom->m_page;
-  
-//    CookieJar *cookieJar=CookieJar::create(this->phantom);
-//  cookieJar->setParent(this->phantom);
-//  cout << "SocketClient[" << threadId << "]: set CookieJar" << endl;
-//	this->webpage->m_networkAccessManager->setCookieJar(cookieJar);
-//  this->webpage->m_networkAccessManager->cookieJar->setParent(this->phantom());
-  
+
 #ifdef SOCKET_CLIENT_DEBUG
   qDebug() << "SocketClient[" << threadId << "]: setup";
 #endif
@@ -71,7 +67,7 @@ void SocketClient::setup(Main *main, SocketServer *socketServer)
 	  Qt::QueuedConnection);
 
       // Listen for Phantom exit(ing)
-      connect(this->phantom, SIGNAL(aboutToExit(int)), this, SLOT(client_disconnected(void)));
+  connect(this->phantom, SIGNAL(aboutToExit(int)), this, SLOT(client_disconnected(void)), Qt::QueuedConnection);
 
 }
 

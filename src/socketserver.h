@@ -17,7 +17,7 @@ public:
   ~SocketServer();
 
 public:
-  void setup(Main *main);
+  void setup(Main *main,const QString &sHost, uint sPort);
 
 public slots:
   void doWork();
@@ -33,6 +33,8 @@ private:
   QTcpSocket *client_socket;
   QWebFrame *webframe;
   QMap <quint64, QThread*> threadInstancesMap;
+  uint serverPort;
+  QString serverHost;
 
 };
  
