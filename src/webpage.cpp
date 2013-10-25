@@ -215,10 +215,10 @@ protected:
 
         // Create a new "raw" WebPage object
         if (m_webPage->ownsPages()) {
-            newPage = new WebPage(m_webPage);
+ 	  newPage = new WebPage(m_webPage, QUrl(), m_webPage->m_cookieJar);
         } else {
-            newPage = new WebPage(Phantom::instance());
-            Phantom::instance()->m_pages.append(newPage);
+  	  newPage = new WebPage(Phantom::instance(), QUrl(), m_webPage->m_cookieJar);
+          Phantom::instance()->m_pages.append(newPage);
         }
 
         // Apply default settings
@@ -333,12 +333,16 @@ WebPage::WebPage(QObject *parent, const QUrl &baseUrl, CookieJar *cookieJar)
     , m_ownsPages(true)
     , m_loadingProgress(0)
 {
-    setObjectName("WebPage");
+   setObjectName("WebPage");
     m_callbacks = new WebpageCallbacks(this);
     m_customWebPage = new CustomPage(this);
     m_mainFrame = m_customWebPage->mainFrame();
     m_currentFrame = m_mainFrame;
     m_mainFrame->setHtml(BLANK_HTML, baseUrl);
+
+#ifndef QT_NO_DEBUG_OUTPUT
+    qDebug() << "WebPage creation with CookieJar instance:" << cookiejar;
+#endif
 
     Config *phantomCfg = Phantom::instance()->config();
 
