@@ -341,7 +341,7 @@ WebPage::WebPage(QObject *parent, const QUrl &baseUrl, CookieJar *cookieJar)
     m_mainFrame->setHtml(BLANK_HTML, baseUrl);
 
 #ifndef QT_NO_DEBUG_OUTPUT
-    qDebug() << "WebPage creation with CookieJar instance:" << cookiejar;
+    qDebug() << "WebPage creation with CookieJar instance:" << cookieJar;
 #endif
 
     Config *phantomCfg = Phantom::instance()->config();
