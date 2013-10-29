@@ -75,14 +75,15 @@ public:
 private slots:
     bool purgeExpiredCookies();
     bool purgeSessionCookies();
-    void save();
-    void load();
+    /* void save(); */
+    /* void load(); */
 
 private:
     bool contains(const QNetworkCookie &cookie) const;
 
 private:
-    QSettings *m_cookieStorage;
+    // Store disabled
+    /* QSettings *m_cookieStorage; */
     bool m_enabled;
 	QUuid uuid;
 };

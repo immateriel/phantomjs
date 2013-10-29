@@ -176,13 +176,13 @@ Phantom *Phantom::instance() {
 
 Phantom::~Phantom()
 {
-//	qDebug() << "Phantom: delete";
-  if (m_cookieJar != NULL)
-    {
-	delete m_cookieJar;
-	m_cookieJar = NULL;
-    }
-    // Nothing to do: cleanup is handled by QObject relationships
+  qDebug() << "Phantom: delete";
+
+  m_terminated = true;
+  qDeleteAll(m_pages);
+  m_pages.clear();
+  m_page = 0;
+  // Nothing to do: cleanup is handled by QObject relationships
 }
 
 QStringList Phantom::args() const

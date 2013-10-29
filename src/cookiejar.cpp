@@ -85,11 +85,11 @@ QT_END_NAMESPACE
 // private:
 CookieJar::CookieJar(QString cookiesFile, QObject *parent)
     : QNetworkCookieJar(parent)
-    , m_cookieStorage(new QSettings(cookiesFile, QSettings::IniFormat, this))
+    // , m_cookieStorage(new QSettings(cookiesFile, QSettings::IniFormat, this))
     , m_enabled(true)
 {
 	uuid=QUuid::createUuid();
-	load();
+	// load();
 #ifndef QT_NO_DEBUG_OUTPUT
 	qDebug() << "CookieJar[" << uuid <<"] Instantiated";
 #endif	
@@ -115,14 +115,15 @@ CookieJar *CookieJar::instance(QString cookiesFile)
 
 CookieJar *CookieJar::create(QString cookiesFile,QObject *parent)
 {	
-	return (new CookieJar(cookiesFile, parent));
+	// return (new CookieJar(cookiesFile, parent));
 }
 
 CookieJar::~CookieJar()
 {
     // On destruction, before saving, clear all the session cookies
     purgeSessionCookies();
-	save();
+	// save();
+
 #ifndef QT_NO_DEBUG_OUTPUT
 	qDebug() << "CookieJar[" << uuid <<"] Deleted ";
 #endif
@@ -133,7 +134,7 @@ bool CookieJar::setCookiesFromUrl(const QList<QNetworkCookie> & cookieList, cons
     // Update cookies in memory
     if (isEnabled()) {
         QNetworkCookieJar::setCookiesFromUrl(cookieList, url);
-        save();
+        // save();
     }
     // No changes occurred
     return false;
@@ -461,6 +462,7 @@ bool CookieJar::purgeSessionCookies()
     return false;
 }
 
+#if 0
 void CookieJar::save()
 {
     if (isEnabled()) {
@@ -474,7 +476,7 @@ void CookieJar::save()
 #endif
 
         // Store cookies
-        m_cookieStorage->setValue(uuid.toString(), QVariant::fromValue<QList<QNetworkCookie> >(allCookies()));
+        // m_cookieStorage->setValue(uuid.toString(), QVariant::fromValue<QList<QNetworkCookie> >(allCookies()));
     }
 }
 
@@ -485,7 +487,7 @@ void CookieJar::load()
         qRegisterMetaTypeStreamOperators<QList<QNetworkCookie> >("QList<QNetworkCookie>");
 
         // Load all the cookies
-        setAllCookies(qvariant_cast<QList<QNetworkCookie> >(m_cookieStorage->value(uuid.toString())));
+        // setAllCookies(qvariant_cast<QList<QNetworkCookie> >(m_cookieStorage->value(uuid.toString())));
 
         // If any cookie has expired since last execution, purge and save before going any further
         if (purgeExpiredCookies()) {
@@ -499,6 +501,8 @@ void CookieJar::load()
 #endif
     }
 }
+
+#endif
 
 bool CookieJar::contains(const QNetworkCookie &cookie) const
 {
