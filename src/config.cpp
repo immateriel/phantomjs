@@ -539,7 +539,7 @@ void Config::resetToDefaults()
     m_javascriptCanCloseWindows = true;
     m_helpFlag = false;
     m_printDebugMessages = false;
-    m_sslProtocol = "sslv3";
+    m_sslProtocol = "any";
     m_sslCertificatesPath.clear();
     m_webdriverIp = QString();
     m_webdriverPort = QString();
