@@ -128,6 +128,8 @@ NetworkAccessManager::NetworkAccessManager(QObject *parent, const Config *config
 	if (cookieJar) {
 //		cout << "NetworkAccessManager: set cookieJar" << endl;
 		setCookieJar(cookieJar);
+		cookieJar->setParent(Phantom::instance());
+		
 	} else {
 		cookieJar=CookieJar::instance();
 		cookieJar->setParent(Phantom::instance());
