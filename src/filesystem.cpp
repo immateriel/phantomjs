@@ -72,7 +72,9 @@ QString File::read(const QVariant &n)
     const bool isReadAll = 0 > bytesToRead;
 
     if ( !m_file->isReadable() ) {
+#ifdef FILESYSTEM_DEBUG
         qDebug() << "File::read - " << "Couldn't read:" << m_file->fileName();
+#endif
         return QString();
     }
     if ( m_file->isWritable() ) {
@@ -117,7 +119,9 @@ QString File::read(const QVariant &n)
 bool File::write(const QString &data)
 {
     if ( !m_file->isWritable() ) {
+#ifdef FILESYSTEM_DEBUG
         qDebug() << "File::write - " << "Couldn't write:" << m_file->fileName();
+#endif
         return true;
     }
     if ( m_fileStream ) {
@@ -149,7 +153,9 @@ bool File::seek(const qint64 pos)
 QString File::readLine()
 {
     if ( !m_file->isReadable() ) {
+#ifdef FILESYSTEM_DEBUG
         qDebug() << "File::readLine - " << "Couldn't read:" << m_file->fileName();
+#endif
         return QString();
     }
     if ( m_file->isWritable() ) {
@@ -170,7 +176,9 @@ bool File::writeLine(const QString &data)
     if ( write(data) && write("\n") ) {
         return true;
     }
+#ifdef FILESYSTEM_DEBUG
     qDebug() << "File::writeLine - " << "Couldn't write:" << m_file->fileName();
+#endif
     return false;
 }
 
@@ -185,7 +193,9 @@ bool File::atEnd() const
             return m_file->atEnd();
         }
     }
+#ifdef FILESYSTEM_DEBUG
     qDebug() << "File::atEnd - " << "Couldn't read:" << m_file->fileName();
+#endif
     return false;
 }
 
@@ -444,12 +454,15 @@ QString FileSystem::toNativeSeparators(const QString &path) const
 // Files
 QObject *FileSystem::_open(const QString &path, const QVariantMap &opts) const
 {
+#ifdef FILESYSTEM_DEBUG
     qDebug() << "FileSystem - _open:" << path << opts;
-
+#endif
     const QVariant modeVar = opts["mode"];
     // Ensure only strings
     if (modeVar.type() != QVariant::String) {
+#ifdef FILESYSTEM_DEBUG
         qDebug() << "FileSystem::open - " << "Mode must be a string!" << modeVar;
+#endif
         return 0;
     }
 
@@ -477,7 +490,9 @@ QObject *FileSystem::_open(const QString &path, const QVariantMap &opts) const
             break;
         }
         default: {
+#ifdef FILESYSTEM_DEBUG
             qDebug() << "FileSystem::open - " << "Wrong Mode:" << c;
+#endif
             return 0;
         }
         }
@@ -486,14 +501,18 @@ QObject *FileSystem::_open(const QString &path, const QVariantMap &opts) const
     // Make sure the file exists OR it can be created at the required path
     if ( !QFile::exists(path) && modeCode & QFile::WriteOnly ) {
         if ( !makeTree(QFileInfo(path).dir().absolutePath()) ) {
+#ifdef FILESYSTEM_DEBUG
             qDebug() << "FileSystem::open - " << "Full path coulnd't be created:" << path;
+#endif
             return 0;
         }
     }
 
     // Make sure there is something to read
     if ( !QFile::exists(path) && modeCode & QFile::ReadOnly ) {
+#ifdef FILESYSTEM_DEBUG
         qDebug() << "FileSystem::open - " << "Trying to read a file that doesn't exist:" << path;
+#endif
         return 0;
     }
 
@@ -503,7 +522,9 @@ QObject *FileSystem::_open(const QString &path, const QVariantMap &opts) const
         const QString charset = opts.value("charset", "UTF-8").toString();
         codec = QTextCodec::codecForName(charset.toAscii());
         if (!codec) {
+#ifdef FILESYSTEM_DEBUG
             qDebug() << "FileSystem::open - " << "Unknown charset:" << charset;
+#endif
             return 0;
         }
     }
@@ -513,7 +534,9 @@ QObject *FileSystem::_open(const QString &path, const QVariantMap &opts) const
     if ( !file->open(modeCode) ) {
         // Return "NULL" if the file couldn't be opened as requested
         delete file;
+#ifdef FILESYSTEM_DEBUG
         qDebug() << "FileSystem::open - " << "Couldn't be opened:" << path;
+#endif
         return 0;
     }
 

@@ -176,8 +176,6 @@ Phantom *Phantom::instance() {
 
 Phantom::~Phantom()
 {
-  qDebug() << "Phantom: delete";
-
   m_terminated = true;
   qDeleteAll(m_pages);
   m_pages.clear();
@@ -210,7 +208,7 @@ bool Phantom::execute()
     if (m_terminated)
         return false;
 
-#ifndef QT_NO_DEBUG_OUTPUT
+#ifdef PHANTOM_JS
     qDebug() << "Phantom - execute: Configuration";
     const QMetaObject* configMetaObj = m_config.metaObject();
     for (int i = 0, ilen = configMetaObj->propertyCount(); i < ilen; ++i) {
@@ -226,21 +224,24 @@ bool Phantom::execute()
 #endif
 
     if (m_config.isWebdriverMode()) {                                   // Remote WebDriver mode requested
+#ifdef PHANTOM_JS
         qDebug() << "Phantom - execute: Starting Remote WebDriver mode";
-
+#endif
         Terminal::instance()->cout("PhantomJS is launching GhostDriver...");
         if (!Utils::injectJsInFrame(":/ghostdriver/main.js", m_scriptFileEnc, QDir::currentPath(), m_page->mainFrame(), true)) {
             m_returnValue = -1;
             return false;
         }
     } else if (m_config.scriptFile().isEmpty()) {                       // REPL mode requested
+#ifdef PHANTOM_JS
         qDebug() << "Phantom - execute: Starting REPL mode";
-
+#endif
         // Create the REPL: it will launch itself, no need to store this variable.
         REPL::getInstance(m_page->mainFrame(), this);
     } else {                                                            // Load the User Script
+#ifdef PHANTOM_JS
         qDebug() << "Phantom - execute: Starting normal mode";
-
+#endif
         if (m_config.debug()) {
             // Debug enabled
             if (!Utils::loadJSForDebug(m_config.scriptFile(), m_scriptFileEnc, QDir::currentPath(), m_page->mainFrame(), m_config.remoteDebugAutorun())) {
@@ -402,12 +403,15 @@ void Phantom::loadModule(const QString &moduleSource, const QString &filename)
 bool Phantom::injectJs(const QString &jsFilePath)
 {
     QString pre = "";
+#ifdef PHANTOM_JS
     qDebug() << "Phantom - injectJs:" << jsFilePath;
-
+#endif
     // If in Remote Webdriver Mode, we need to manipulate the PATH, to point it to a resource in `ghostdriver.qrc`
     if (webdriverMode()) {
         pre = ":/ghostdriver/";
+#ifdef PHANTOM_JS
         qDebug() << "Phantom - injectJs: prepending" << pre;
+#endif
     }
 
     if (m_terminated)

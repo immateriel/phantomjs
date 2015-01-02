@@ -29,6 +29,8 @@ needs to be executed.
 - Then the javascript string code.
  */
 
+#define SOCKETSERVER_DEBUG
+
 SocketServer::SocketServer(QObject *parent)
 {
     Utils::printDebugMessages = true;
@@ -53,14 +55,18 @@ void SocketServer::sendConsoleMessage(const QString &message)
 
 void SocketServer::doWork()
 {
+#ifdef SOCKETSERVER_DEBUG
   qDebug() << "SocketServer: listening for connection on"<<this->serverHost<<":"<<this->serverPort;
+#endif
 
   QTcpServer server;
   bool status = server.listen(QHostAddress(this->serverHost), this->serverPort);
 
   if (!status)
     {
+#ifdef SOCKETSERVER_DEBUG
       qDebug() << "SocketServer: can't open TCP Server.";
+#endif
       exit(1);
     }
 
@@ -70,11 +76,15 @@ void SocketServer::doWork()
       status = server.waitForNewConnection(-1);
       if (status)
 	{
+#ifdef SOCKETSERVER_DEBUG
 	  qDebug() << "SocketServer: new connection available";
+#endif
 	  client_socket = server.nextPendingConnection();
 	  if (client_socket == NULL)
 	    {
+#ifdef SOCKETSERVER_DEBUG
 	      qDebug() << "SocketServer: client socket is NULL";
+#endif
 	    }
 	  else
 	    {
@@ -89,8 +99,9 @@ void SocketServer::doWork()
 
 	      threadInstancesMap[thread_id] = thread;
 
+#ifdef SOCKETSERVER_DEBUG
 	      qDebug() << "SocketServer: add thread instance"<<thread_id<<", total: " << threadInstancesMap.size();
-
+#endif
 	      socketClient->moveToThread(thread);
 
 	      socketClient->client_socket = client_socket;
@@ -102,7 +113,9 @@ void SocketServer::doWork()
 	}
       else
 	{
+#ifdef SOCKETSERVER_DEBUG
 	  qDebug() << "SocketServer: problem waiting for a new connection";
+#endif
 	}
 
     }
@@ -114,7 +127,8 @@ void SocketServer::deleteThreadInstance(quint64 threadId)
   QThread *thread = threadInstancesMap[threadId];
   threadInstancesMap.remove(threadId);
 
+#ifdef SOCKETSERVER_DEBUG
   qDebug() << "SocketServer: delete thread instance"<<threadId<<", total: " << threadInstancesMap.size();
-  	  
+#endif  	  
   thread->quit();
 }

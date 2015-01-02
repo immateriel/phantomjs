@@ -20,7 +20,7 @@ using namespace std;
 /*
  */
 
-#define SOCKET_CLIENT_DEBUG 1
+//#define SOCKET_CLIENT_DEBUG 1
 // #undef SOCKET_CLIENT_DEBUG
 
 SocketClient::SocketClient(QThread *thread)
@@ -101,7 +101,9 @@ void SocketClient::copyJsConsoleMessageToClientSocket(const QString &message)
 
 void SocketClient::client_disconnected()
 {
+#ifdef SOCKET_CLIENT_DEBUG
   qDebug() << "SocketClient[" << threadId << "]: client disconnected";
+#endif
   if (client_socket != NULL)
     {
       client_socket->close();
@@ -246,7 +248,9 @@ void SocketClient::doWork()
 	}
       else
 	{
+#ifdef SOCKET_CLIENT_DEBUG
 	  qDebug() << "SocketClient[" << threadId << "]: no header found";
+#endif
 //	  cerr << "SocketClient[" << threadId << "]: incorrect header_data : «" << request_data.data() << "» " << endl;
 	  client_disconnected();
 	  return;
@@ -278,9 +282,9 @@ void SocketClient::doWork()
 	}
 #ifdef SOCKET_CLIENT_DEBUG
       qDebug() << "SocketClient[" << threadId << "]: whole request read « " << request_data.data() << " »";
-#endif
 // , it is:«" << request_data.data () << "» " << endl;
 	  qDebug() << "SocketClient[" << threadId << "]: evaluate javascript";
+#endif
 //      cout << "et en invokant? " << endl;
       QMetaObject::invokeMethod(webpage->mainFrame(), "evaluateJavaScript", Qt::QueuedConnection, Q_ARG(QString, QString(request_data.data())) );
 

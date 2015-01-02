@@ -90,7 +90,7 @@ CookieJar::CookieJar(QString cookiesFile, QObject *parent)
 {
 	uuid=QUuid::createUuid();
 	// load();
-#ifndef QT_NO_DEBUG_OUTPUT
+#ifdef COOKIEJAR_DEBUG
 	qDebug() << "CookieJar[" << uuid <<"] Instantiated";
 #endif	
 
@@ -100,12 +100,15 @@ CookieJar::CookieJar(QString cookiesFile, QObject *parent)
 CookieJar *CookieJar::instance(QString cookiesFile)
 {
     static CookieJar *singleton = NULL;
+
     if (!singleton) {
+#ifdef COOKIEJAR_DEBUG
         if (cookiesFile.isEmpty()) {
             qDebug() << "CookieJar - Created but will not store cookies (use option '--cookies-file=<filename>' to enable persistent cookie storage)";
         } else {
             qDebug() << "CookieJar - Created and will store cookies in:" << cookiesFile;
         }
+#endif
         // Create singleton and assign ownershipt to the Phantom singleton object
         // NOTE: First time this is done is when we set "once and for all" the Cookies' File
         singleton = new CookieJar(cookiesFile, Phantom::instance());
@@ -121,12 +124,13 @@ CookieJar *CookieJar::create(QString cookiesFile,QObject *parent)
 CookieJar::~CookieJar()
 {
     // On destruction, before saving, clear all the session cookies
-    purgeSessionCookies();
+	purgeSessionCookies();
 	// save();
 
-#ifndef QT_NO_DEBUG_OUTPUT
+#ifdef COOKIEJAR_DEBUG
 	qDebug() << "CookieJar[" << uuid <<"] Deleted ";
 #endif
+
 }
 
 bool CookieJar::setCookiesFromUrl(const QList<QNetworkCookie> & cookieList, const QUrl &url)
@@ -166,7 +170,9 @@ bool CookieJar::addCookie(const QNetworkCookie &cookie, const QString &url)
         if (contains(cookie)) {
             return true;
         }
+#ifdef COOKIEJAR_DEBUG
         qDebug() << "CookieJar - Rejected Cookie" << cookie.toRawForm();
+#endif
         return false;
     }
     return false;
@@ -337,7 +343,9 @@ bool CookieJar::deleteCookie(const QString &name, const QString &url)
                 for (int i = cookiesListAll.length() -1; i >= 0; --i) {
                     if (cookiesListAll.at(i).name() == name) {
                         // Remove this cookie
+#ifdef COOKIEJAR_DEBUG
                         qDebug() << "CookieJar[" << uuid <<"] Deleted" << cookiesListAll.at(i).toRawForm();
+#endif
                         cookiesListAll.removeAt(i);
                         deleted = true;
                     }
@@ -352,7 +360,9 @@ bool CookieJar::deleteCookie(const QString &name, const QString &url)
                 if (cookiesListUrl.contains(cookiesListAll.at(i)) &&            //< if it part of the set of cookies visible at URL
                     (cookiesListAll.at(i).name() == name || name.isEmpty())) {  //< and if the name matches, or no name provided
                     // Remove this cookie
+#ifdef COOKIEJAR_DEBUG
                     qDebug() << "CookieJar - Deleted" << cookiesListAll.at(i).toRawForm();
+#endif
                     cookiesListAll.removeAt(i);
                     deleted = true;
 
@@ -380,7 +390,9 @@ bool CookieJar::deleteCookies(const QString &url)
         }
 
         // No cookie name provided: delete all the cookies visible by this URL
+#ifdef COOKIEJAR_DEBUG
         qDebug() << "Delete all cookies for URL:" << url;
+#endif
         return deleteCookie("", url);
     }
     return false;
@@ -423,7 +435,9 @@ bool CookieJar::purgeExpiredCookies()
     QDateTime now = QDateTime::currentDateTime();
     for (int i = cookiesList.count() - 1; i >= 0; --i) {
         if (!cookiesList.at(i).isSessionCookie() && cookiesList.at(i).expirationDate() < now) {
+#ifdef COOKIEJAR_DEBUG
             qDebug() << "CookieJar[" << uuid <<"] Purged (expired)" << cookiesList.at(i).toRawForm();
+#endif
             cookiesList.removeAt(i);
         }
     }
@@ -449,7 +463,9 @@ bool CookieJar::purgeSessionCookies()
     int prePurgeCookiesCount = cookiesList.count();
     for (int i = cookiesList.count() - 1; i >= 0; --i) {
         if (cookiesList.at(i).isSessionCookie() || !cookiesList.at(i).expirationDate().isValid() || cookiesList.at(i).expirationDate().isNull()) {
+#ifdef COOKIEJAR_DEBUG
             qDebug() << "CookieJar[" << uuid <<"] Purged (session)" << cookiesList.at(i).toRawForm();
+#endif
             cookiesList.removeAt(i);
         }
     }
@@ -469,7 +485,7 @@ void CookieJar::save()
         // Get rid of all the Cookies that have expired
         purgeExpiredCookies();
 
-#ifndef QT_NO_DEBUG_OUTPUT
+#ifdef COOKIEJAR_DEBUG
         foreach (QNetworkCookie cookie, allCookies()) {
             qDebug() << "CookieJar[" << uuid <<"] Saved "<< cookie.toRawForm();
         }
@@ -494,7 +510,7 @@ void CookieJar::load()
             save();
         }
 
-#ifndef QT_NO_DEBUG_OUTPUT
+#ifdef COOKIEJAR_DEBUG
         foreach (QNetworkCookie cookie, allCookies()) {
             qDebug() << "CookieJar - Loaded" << cookie.toRawForm();
         }

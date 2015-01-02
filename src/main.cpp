@@ -92,7 +92,9 @@ Main *Main::instance()
 void Main::createPhantomJSInstance(quint64 threadId)
 	{
 		
+#ifdef MAIN_DEBUG
 	qDebug() << "Main: create phantomjs instance for" << threadId;
+#endif
   Phantom *phantom = new Phantom();
   phantom->config()->setWebSecurityEnabled(false);
   phantom->init();
@@ -111,8 +113,9 @@ void Main::addThreadInstance(quint64 threadId, QThread *thread)
 
 void Main::deletePhantomJSInstance(quint64 threadId)
 {
+#ifdef MAIN_DEBUG
 	qDebug() << "Main: delete phantomjs instance from" << threadId;
-	
+#endif	
 //  cout << "Main: deletePhantomJSInstance() for threadId " << threadId << endl;
   Phantom *phantom = phantomInstancesMap[threadId];
 //  phantom->clearCookies();
