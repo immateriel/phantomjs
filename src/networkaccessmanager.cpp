@@ -401,9 +401,11 @@ void NetworkAccessManager::handleFinished(QNetworkReply *reply, const QVariant &
 void NetworkAccessManager::handleSslErrors(const QList<QSslError> &errors)
 {
     QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
+#ifdef NETWORK_DEBUG
     foreach (QSslError e, errors) {
         qDebug() << "Network - SSL Error:" << e;
     }
+#endif
 
     if (m_ignoreSslErrors)
         reply->ignoreSslErrors();
@@ -412,11 +414,12 @@ void NetworkAccessManager::handleSslErrors(const QList<QSslError> &errors)
 void NetworkAccessManager::handleNetworkError()
 {
     QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
+#ifdef NETWORK_DEBUG
     qDebug() << "Network - Resource request error:"
              << reply->error()
              << "(" << reply->errorString() << ")"
              << "URL:" << reply->url().toString();
-
+#endif
     QVariantMap data;
     data["id"] = m_ids.value(reply);
     data["url"] = reply->url().toString();
