@@ -17,15 +17,14 @@ using namespace std;
 #include "networkaccessmanager.h"
 #include "main.h"
 
-/*
- */
+//#define SOCKET_CLIENT_DEBUG
 
-//#define SOCKET_CLIENT_DEBUG 1
-// #undef SOCKET_CLIENT_DEBUG
-
-SocketClient::SocketClient(QThread *thread)
+SocketClient::SocketClient(QThread *thread, QTcpSocket *client)
 {
   this->thread = thread;
+  this->client_socket = client;
+  this->client_socket->setParent(this);
+  // this->client_socket->moveToThread(thread);
 }
 
 SocketClient::~SocketClient()
@@ -37,21 +36,20 @@ void SocketClient::setup(Main *main, SocketServer *socketServer)
   this->main = main;
   this->socketServer = socketServer;
 
-  quint64 thread_id = (quint64) (void*)this;
-  this->threadId = thread_id;
+  this->threadId = (quint64) (void*)thread;
 
-  QMetaObject::invokeMethod(main, "createPhantomJSInstance", Qt::QueuedConnection, Q_ARG(quint64, thread_id));
+  QMetaObject::invokeMethod(main, "createPhantomJSInstance", Qt::QueuedConnection, Q_ARG(quint64, threadId));
 
   int tmp;
   
-  while (!main->phantomInstancesMap.contains(thread_id)){
+  while (!main->phantomInstancesMap.contains(threadId)){
 #ifdef SOCKET_CLIENT_DEBUG	  
 	qDebug()  << "SocketClient[" << threadId << "]: waiting for phantomjs instance";
 #endif
     sleep(1);
   }
 
-  this->phantom = ((*main).phantomInstancesMap).value(thread_id);
+  this->phantom = ((*main).phantomInstancesMap).value(threadId);
 
   this->phantom->socketClient = this;
   this->webpage = phantom->m_page;
@@ -87,7 +85,7 @@ void SocketClient::sendConsoleMessage(const QString &message)
 void SocketClient::copyJsConsoleMessageToClientSocket(const QString &message)
 {
 #ifdef SOCKET_CLIENT_DEBUG
-  qDebug() << "SocketClient[" << threadId << "]: message sent 2";
+  qDebug() << "SocketClient[" << threadId << "]: copy JS message";
   // message.toUtf8().data() << "'" << endl;
 #endif
 

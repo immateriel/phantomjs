@@ -30,7 +30,6 @@ signals:
 private:
   Phantom *phantom;
   Main *main;
-  QTcpSocket *client_socket;
   QWebFrame *webframe;
   QMap <quint64, QThread*> threadInstancesMap;
   uint serverPort;

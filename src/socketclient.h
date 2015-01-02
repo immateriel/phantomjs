@@ -18,12 +18,12 @@ class SocketClient : public QObject
   Q_OBJECT
 
 public:
-  SocketClient(QThread *thread);
+  SocketClient(QThread *thread, QTcpSocket *client);
   ~SocketClient();
 
 public:
   void setup(Main *main, SocketServer *socketServer);
-  QTcpSocket *client_socket;
+
   SocketServer *socketServer;
 
     // Causes the current thread to sleep for msecs milliseconds.
@@ -53,6 +53,7 @@ private:
   WebPage *webpage;
   quint64 threadId;
   QThread *thread;
+  QTcpSocket *client_socket;
 
 };
  

@@ -70,6 +70,8 @@ Q_IMPORT_PLUGIN(qico)
 #error Something is wrong with the setup. Please report to the mailing list!
 #endif
 
+//#define MAIN_DEBUG
+
 static Main *mainInstance = NULL;
 
 Main::Main(QObject *parent)
@@ -93,28 +95,26 @@ void Main::createPhantomJSInstance(quint64 threadId)
 	{
 		
 #ifdef MAIN_DEBUG
-	qDebug() << "Main: create phantomjs instance for" << threadId;
+	  qDebug() << "Main: create phantomjs instance for" << QString("0x%1").arg(threadId,0,16);
 #endif
   Phantom *phantom = new Phantom();
   phantom->config()->setWebSecurityEnabled(false);
   phantom->init();
-  //  this->phantom = phantom;
-  
-//  cout << "MMMMMMM CHECK :" << phantom->config()->webSecurityEnabled() << endl;
-  
   phantomInstancesMap[threadId] = phantom;
 }
 
 void Main::addThreadInstance(quint64 threadId, QThread *thread)
 {
-//  cout << "Main: addThreadInstance threadId: " << threadId << endl;
+#ifdef MAIN_DEBUG
+  qDebug() << "Main: addThreadInstance threadId: " << threadId;
+#endif
   threadInstancesMap[threadId] = thread;
 }
 
 void Main::deletePhantomJSInstance(quint64 threadId)
 {
 #ifdef MAIN_DEBUG
-	qDebug() << "Main: delete phantomjs instance from" << threadId;
+	qDebug() << "Main: delete phantomjs instance from" << QString("0x%1").arg(threadId,0,16);
 #endif	
 //  cout << "Main: deletePhantomJSInstance() for threadId " << threadId << endl;
   Phantom *phantom = phantomInstancesMap[threadId];
@@ -188,9 +188,13 @@ for (int i = 0; i < args.size(); ++i)
     Main *main = Main::instance();
     SocketServer *socketServer = new SocketServer(main);
     QThread *thread = new QThread();
-    socketServer->moveToThread(thread);
+    	      quint64 threadId = (quint64) (void*)thread;
+#ifdef MAIN_DEBUG
+	      qDebug() << "Main: create server thread"<<QString("0x%1").arg(threadId,0,16);
+#endif
+socketServer->moveToThread(thread);
     socketServer->setup(main, host, port);
-    thread->start();
+     thread->start();
     QMetaObject::invokeMethod(socketServer, "doWork", Qt::QueuedConnection);
 #if defined(Q_OS_LINUX)
     if (QSslSocket::supportsSsl()) {

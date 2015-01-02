@@ -55,12 +55,16 @@ void SocketServer::sendConsoleMessage(const QString &message)
 
 void SocketServer::doWork()
 {
-#ifdef SOCKETSERVER_DEBUG
-  qDebug() << "SocketServer: listening for connection on"<<this->serverHost<<":"<<this->serverPort;
-#endif
+  QThread *currentThread=QThread::currentThread();
+    quint64 currentThreadId = (quint64) (void*)currentThread;
 
-  QTcpServer server;
-  bool status = server.listen(QHostAddress(this->serverHost), this->serverPort);
+  QTcpServer *server;
+  server=new QTcpServer(this);
+  bool status = server->listen(QHostAddress(this->serverHost), this->serverPort);
+
+#ifdef SOCKETSERVER_DEBUG
+  qDebug() << "SocketServer: listening for connection on"<<this->serverHost<<":"<<this->serverPort<<"with thread"<<QString("0x%1").arg(currentThreadId,0,16) << server << server->parent(); 
+#endif
 
   if (!status)
     {
@@ -73,14 +77,14 @@ void SocketServer::doWork()
   while (true)
     {
 
-      status = server.waitForNewConnection(-1);
+      status = server->waitForNewConnection(-1);
       if (status)
 	{
 #ifdef SOCKETSERVER_DEBUG
 	  qDebug() << "SocketServer: new connection available";
 #endif
-	  client_socket = server.nextPendingConnection();
-	  if (client_socket == NULL)
+	  QTcpSocket *client = server->nextPendingConnection();
+	  if (client == NULL)
 	    {
 #ifdef SOCKETSERVER_DEBUG
 	      qDebug() << "SocketServer: client socket is NULL";
@@ -90,24 +94,22 @@ void SocketServer::doWork()
 	    {
 	      QThread *thread = new QThread();
 
-//		  client_socket->moveToThread(thread);
-	      thread->start();
+	      SocketClient *socketClient = new SocketClient(thread,client);
 
-	      SocketClient *socketClient = new SocketClient(thread);
+	      quint64 threadId = (quint64) (void*)thread;
 
-	      quint64 thread_id = (quint64) (void*)socketClient;
 
-	      threadInstancesMap[thread_id] = thread;
+	      threadInstancesMap[threadId] = thread;
 
 #ifdef SOCKETSERVER_DEBUG
-	      qDebug() << "SocketServer: add thread instance"<<thread_id<<", total: " << threadInstancesMap.size();
+	      qDebug() << "SocketServer: add thread instance"<<QString("0x%1").arg(threadId,0,16)<<", total: " << threadInstancesMap.size();
 #endif
-	      socketClient->moveToThread(thread);
 
-	      socketClient->client_socket = client_socket;
+	      socketClient->moveToThread(thread);
 
 	      socketClient->setup(main, this);
 	      QMetaObject::invokeMethod(socketClient, "doWork", Qt::QueuedConnection);
+	      thread->start();
 
 	    }
 	}
@@ -125,10 +127,12 @@ void SocketServer::deleteThreadInstance(quint64 threadId)
 {
 	
   QThread *thread = threadInstancesMap[threadId];
+
   threadInstancesMap.remove(threadId);
 
 #ifdef SOCKETSERVER_DEBUG
-  qDebug() << "SocketServer: delete thread instance"<<threadId<<", total: " << threadInstancesMap.size();
+  qDebug() << "SocketServer: delete thread instance"<<QString("0x%1").arg(threadId,0,16)<<", total: " << threadInstancesMap.size();
 #endif  	  
+
   thread->quit();
 }
