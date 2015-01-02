@@ -70,7 +70,7 @@ Q_IMPORT_PLUGIN(qico)
 #error Something is wrong with the setup. Please report to the mailing list!
 #endif
 
-//#define MAIN_DEBUG
+#define MAIN_DEBUG
 
 static Main *mainInstance = NULL;
 
@@ -98,6 +98,7 @@ void Main::createPhantomJSInstance(quint64 threadId)
 	  qDebug() << "Main: create phantomjs instance for" << QString("0x%1").arg(threadId,0,16);
 #endif
   Phantom *phantom = new Phantom();
+
   phantom->config()->setWebSecurityEnabled(false);
   phantom->init();
   phantomInstancesMap[threadId] = phantom;
@@ -187,14 +188,18 @@ for (int i = 0; i < args.size(); ++i)
 
     Main *main = Main::instance();
     SocketServer *socketServer = new SocketServer(main);
+
     QThread *thread = new QThread();
     	      quint64 threadId = (quint64) (void*)thread;
+
 #ifdef MAIN_DEBUG
 	      qDebug() << "Main: create server thread"<<QString("0x%1").arg(threadId,0,16);
 #endif
-socketServer->moveToThread(thread);
+    
+    socketServer->moveToThread(thread);
     socketServer->setup(main, host, port);
-     thread->start();
+    thread->start();
+
     QMetaObject::invokeMethod(socketServer, "doWork", Qt::QueuedConnection);
 #if defined(Q_OS_LINUX)
     if (QSslSocket::supportsSsl()) {

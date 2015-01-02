@@ -448,8 +448,8 @@ void Phantom::copyJsConsoleMessageToClientSocket(const QString &message)
 
   if (socketClient != NULL)
     {
-      QMetaObject::invokeMethod(socketClient, "sendConsoleMessage", Qt::DirectConnection,
-				Q_ARG(QString, message));
+            QMetaObject::invokeMethod(socketClient, "sendConsoleMessage", Qt::DirectConnection,
+      			Q_ARG(QString, message));
     }	
 }
 

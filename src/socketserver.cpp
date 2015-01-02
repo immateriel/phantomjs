@@ -63,7 +63,7 @@ void SocketServer::doWork()
   bool status = server->listen(QHostAddress(this->serverHost), this->serverPort);
 
 #ifdef SOCKETSERVER_DEBUG
-  qDebug() << "SocketServer: listening for connection on"<<this->serverHost<<":"<<this->serverPort<<"with thread"<<QString("0x%1").arg(currentThreadId,0,16) << server << server->parent(); 
+  qDebug() << "SocketServer: listening for connection on"<<this->serverHost<<":"<<this->serverPort<<"with thread"<<QString("0x%1").arg(currentThreadId,0,16);
 #endif
 
   if (!status)

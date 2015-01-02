@@ -41,16 +41,15 @@ void SocketClient::setup(Main *main, SocketServer *socketServer)
   QMetaObject::invokeMethod(main, "createPhantomJSInstance", Qt::QueuedConnection, Q_ARG(quint64, threadId));
 
   int tmp;
-  
+   
   while (!main->phantomInstancesMap.contains(threadId)){
 #ifdef SOCKET_CLIENT_DEBUG	  
 	qDebug()  << "SocketClient[" << threadId << "]: waiting for phantomjs instance";
 #endif
     sleep(1);
-  }
+    }
 
-  this->phantom = ((*main).phantomInstancesMap).value(threadId);
-
+  this->phantom = main->phantomInstancesMap.value(threadId);
   this->phantom->socketClient = this;
   this->webpage = phantom->m_page;
 
@@ -64,8 +63,12 @@ void SocketClient::setup(Main *main, SocketServer *socketServer)
 	  this, SLOT(copyJsConsoleMessageToClientSocket(QString)),
 	  Qt::QueuedConnection);
 
+  //  connect(this->phantom->m_page, SIGNAL(javaScriptConsoleMessageSent(QString)),this,SLOT(sendConsoleMessage(QString)), Qt::DirectConnection);
+
       // Listen for Phantom exit(ing)
   connect(this->phantom, SIGNAL(aboutToExit(int)), this, SLOT(client_disconnected(void)), Qt::QueuedConnection);
+
+
 
 }
 
@@ -74,9 +77,9 @@ void SocketClient::sendConsoleMessage(const QString &message)
 #ifdef SOCKET_CLIENT_DEBUG
   qDebug() << "SocketClient[" << threadId << "]: send response « " << message.toUtf8().data() << " »";
 #endif
-
   if (client_socket != NULL)
     {
+
       client_socket->write(message.toUtf8().data());
       client_socket->write("\n");
     }
