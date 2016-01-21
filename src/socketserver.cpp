@@ -113,6 +113,7 @@ void SocketServer::doWork()
 	      thread->start();
 #else
         socketClient->doWork();
+        delete socketClient;
 #endif
 	    }
 	}
