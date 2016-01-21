@@ -34,7 +34,6 @@ needs to be executed.
 SocketServer::SocketServer(QObject *parent)
 {
     Utils::printDebugMessages = true;
-
 }
 
 SocketServer::~SocketServer()
@@ -60,6 +59,7 @@ void SocketServer::doWork()
 
   QTcpServer *server;
   server=new QTcpServer(this);
+
   bool status = server->listen(QHostAddress(this->serverHost), this->serverPort);
 
 #ifdef SOCKETSERVER_DEBUG
@@ -105,12 +105,15 @@ void SocketServer::doWork()
 	      qDebug() << "SocketServer: add thread instance"<<QString("0x%1").arg(threadId,0,16)<<", total: " << threadInstancesMap.size();
 #endif
 
-	      socketClient->moveToThread(thread);
-
 	      socketClient->setup(main, this);
+
+#ifdef MULTIPLE_THREADS
+        socketClient->moveToThread(thread);
 	      QMetaObject::invokeMethod(socketClient, "doWork", Qt::QueuedConnection);
 	      thread->start();
-
+#else
+        socketClient->doWork();
+#endif
 	    }
 	}
       else
