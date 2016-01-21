@@ -17,7 +17,7 @@ using namespace std;
 #include "networkaccessmanager.h"
 #include "main.h"
 
-//#define SOCKET_CLIENT_DEBUG
+#define SOCKET_CLIENT_DEBUG
 
 SocketClient::SocketClient(QThread *thread, QTcpSocket *client)
 {
@@ -112,7 +112,9 @@ void SocketClient::client_disconnected()
 
   QMetaObject::invokeMethod(main, "deletePhantomJSInstance", Qt::QueuedConnection, Q_ARG(quint64, threadId));
 
+#ifdef MULTIPLE_THREADS
   socketServer->deleteThreadInstance(threadId);
+#endif
 }
 
 void SocketClient::doWork()

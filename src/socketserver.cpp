@@ -92,17 +92,23 @@ void SocketServer::doWork()
 	    }
 	  else
 	    {
+#ifdef MULTIPLE_THREADS
+
 	      QThread *thread = new QThread();
-
 	      SocketClient *socketClient = new SocketClient(thread,client);
-
 	      quint64 threadId = (quint64) (void*)thread;
-
-
 	      threadInstancesMap[threadId] = thread;
+#ifdef SOCKETSERVER_DEBUG
+        qDebug() << "SocketServer: add thread instance"<<QString("0x%1").arg(threadId,0,16)<<", total: " << threadInstancesMap.size();
+#endif
+
+#else
+        SocketClient *socketClient = new SocketClient(NULL,client);
 
 #ifdef SOCKETSERVER_DEBUG
-	      qDebug() << "SocketServer: add thread instance"<<QString("0x%1").arg(threadId,0,16)<<", total: " << threadInstancesMap.size();
+        qDebug() << "SocketServer: add instance";
+#endif
+
 #endif
 
 	      socketClient->setup(main, this);
