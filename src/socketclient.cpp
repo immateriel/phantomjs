@@ -17,7 +17,7 @@ using namespace std;
 #include "networkaccessmanager.h"
 #include "main.h"
 
-#define SOCKET_CLIENT_DEBUG
+//#define SOCKET_CLIENT_DEBUG
 
 SocketClient::SocketClient(QThread *thread, QTcpSocket *client)
 {
