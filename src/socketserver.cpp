@@ -103,6 +103,7 @@ void SocketServer::doWork()
 #endif
 
 #else
+        server->close();
         SocketClient *socketClient = new SocketClient(NULL,client);
 
 #ifdef SOCKETSERVER_DEBUG
@@ -120,7 +121,9 @@ void SocketServer::doWork()
 #else
         socketClient->doWork();
         delete socketClient;
+        server->listen(QHostAddress(this->serverHost), this->serverPort);
 #endif
+
 	    }
 	}
       else
