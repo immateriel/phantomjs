@@ -28,6 +28,8 @@
   THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#define NETWORK_DEBUG
+
 #include <QAuthenticator>
 #include <QDateTime>
 #include <QDesktopServices>
@@ -136,9 +138,16 @@ NetworkAccessManager::NetworkAccessManager(QObject *parent, const Config *config
 		setCookieJar(cookieJar);		
 	}
 
+
     if (config->diskCacheEnabled()) {
         m_networkDiskCache = new QNetworkDiskCache(this);
-        m_networkDiskCache->setCacheDirectory(QDesktopServices::storageLocation(QDesktopServices::CacheLocation));
+
+        if (config->diskCachePath().isEmpty()) {
+            m_networkDiskCache->setCacheDirectory(QDesktopServices::storageLocation(QDesktopServices::CacheLocation));
+        } else {
+            m_networkDiskCache->setCacheDirectory(config->diskCachePath());
+        }
+
         if (config->maxDiskCacheSize() >= 0)
             m_networkDiskCache->setMaximumCacheSize(config->maxDiskCacheSize() * 1024);
         setCache(m_networkDiskCache);

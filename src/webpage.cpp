@@ -28,6 +28,8 @@
   THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+//#define WEBPAGE_DEBUG
+
 #include "webpage.h"
 
 #include <math.h>
@@ -347,6 +349,7 @@ WebPage::WebPage(QObject *parent, const QUrl &baseUrl, CookieJar *cookieJar)
     , m_ownsPages(true)
     , m_loadingProgress(0)
 {
+    phantom=(Phantom *)parent;
    setObjectName("WebPage");
     m_callbacks = new WebpageCallbacks(this);
     m_customWebPage = new CustomPage(this,cookieJar);
@@ -358,8 +361,8 @@ WebPage::WebPage(QObject *parent, const QUrl &baseUrl, CookieJar *cookieJar)
     qDebug() << "WebPage creation with CookieJar instance:" << cookieJar;
 #endif
 
-    Config *phantomCfg = Phantom::instance()->config();
-
+//    Config *phantomCfg = Phantom::instance()->config();
+    Config *phantomCfg = phantom->config();
     // NOTE: below you can see that between all the event handlers
     // we listen for, "SLOT(setupFrame())" is connected to 2 signals:
     //   1. page.loadFinished
@@ -475,8 +478,10 @@ int WebPage::getInternalIdFromReply(QNetworkReply *reply)
 
 void WebPage::handleUnsupportedContent(QNetworkReply *reply) 
 {
+
   if (m_uc_ids.contains(reply))
     return;
+
   m_uc_idCounter++;
   m_uc_ids[reply] = m_uc_idCounter;
   m_uc_replies[m_uc_idCounter] = reply;

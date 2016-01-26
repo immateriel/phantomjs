@@ -70,7 +70,7 @@ Q_IMPORT_PLUGIN(qico)
 #error Something is wrong with the setup. Please report to the mailing list!
 #endif
 
-#define MAIN_DEBUG
+#define MAIN_DEBUG 1
 
 static Main *mainInstance = NULL;
 
@@ -100,6 +100,10 @@ void Main::createPhantomJSInstance(quint64 threadId)
   Phantom *phantom = new Phantom();
 
   phantom->config()->setWebSecurityEnabled(false);
+//  phantom->config()->setProxy("127.0.0.1:3128");
+  phantom->config()->setDiskCacheEnabled(true);
+  phantom->config()->setMaxDiskCacheSize(1024*1024);
+  phantom->config()->setDiskCachePath("/home/julbouln/Travail/phantomjs/cache/");
   phantom->init();
   phantomInstancesMap[threadId] = phantom;
 }

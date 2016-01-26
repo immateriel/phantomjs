@@ -227,6 +227,17 @@ void Config::setDiskCacheEnabled(const bool value)
     m_diskCacheEnabled = value;
 }
 
+QString Config::diskCachePath() const
+{
+    return m_diskCachePath;
+}
+
+void Config::setDiskCachePath(const QString& value)
+{
+    QDir dir(value);
+    m_diskCachePath = dir.absolutePath();
+}
+
 int Config::maxDiskCacheSize() const
 {
     return m_maxDiskCacheSize;
@@ -517,6 +528,7 @@ void Config::resetToDefaults()
     m_offlineStoragePath = QString();
     m_offlineStorageDefaultQuota = -1;
     m_diskCacheEnabled = false;
+    m_diskCachePath = QString();
     m_maxDiskCacheSize = -1;
     m_ignoreSslErrors = true;
     m_localToRemoteUrlAccessEnabled = false;
