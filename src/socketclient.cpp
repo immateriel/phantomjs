@@ -112,9 +112,7 @@ void SocketClient::client_disconnected()
 
   QMetaObject::invokeMethod(main, "deletePhantomJSInstance", Qt::QueuedConnection, Q_ARG(quint64, threadId));
 
-#ifdef MULTIPLE_THREADS
-  socketServer->deleteThreadInstance(threadId);
-#endif
+  socketServer->disconnect(threadId);
 }
 
 void SocketClient::doWork()
@@ -162,9 +160,6 @@ void SocketClient::doWork()
 	      request_data.append(buf, status_read);
 	    }
 
-		
-//	  cout << "waiting" << endl;
-
 	  /* Once the newline character is read, the header has
 	     been completely read. */
 	  if (request_data.indexOf("\n") != -1)
@@ -181,7 +176,6 @@ void SocketClient::doWork()
 
 	  // if (status_read == 0 && !client_socket->waitForReadyRead())
 	  //   break;
-
 
 	  bool client_ready = false;
 

@@ -3,6 +3,7 @@
 
 #include <QWebFrame>
 #include <QTcpSocket>
+#include <QTcpServer>
 #include <QString>
 
 #include "phantom.h"
@@ -22,7 +23,7 @@ public:
 public slots:
   void doWork();
   void sendConsoleMessage(const QString &message);
-  void deleteThreadInstance(quint64 threadId);
+  void disconnect(quint64 threadId);
 
 signals:
   void evaluateJavaScript(const QString &code);
@@ -34,7 +35,8 @@ private:
   QMap <quint64, QThread*> threadInstancesMap;
   uint serverPort;
   QString serverHost;
-
+  SocketClient *socketClient;
+  QTcpServer *server;
 };
  
 #endif
