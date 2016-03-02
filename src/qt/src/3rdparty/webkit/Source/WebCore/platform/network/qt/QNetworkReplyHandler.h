@@ -27,6 +27,9 @@
 
 #include "FormData.h"
 #include "QtMIMETypeSniffer.h"
+#include <cmath>
+    
+inline bool isValidFileTime(double time) { return std::isfinite(time); }
 
 QT_BEGIN_NAMESPACE
 class QFile;
@@ -35,6 +38,8 @@ QT_END_NAMESPACE
 
 namespace WebCore {
 
+class FormDataIODevice;
+class ResourceError;
 class ResourceHandle;
 class ResourceRequest;
 class ResourceResponse;
@@ -91,10 +96,9 @@ private Q_SLOTS:
     void didReceiveReadyRead();
     void receiveSniffedMIMEType();
     void setFinished();
-    void replyDestroyed();
 
 private:
-    void stopForwarding();
+    void resetConnections();
     void emitMetaDataChanged();
 
     QNetworkReply* m_reply;
@@ -133,7 +137,9 @@ public:
     void forwardData();
     void sendResponseIfNeeded();
 
-private slots:
+    static ResourceError errorForReply(QNetworkReply*);
+
+private Q_SLOTS:
     void uploadProgress(qint64 bytesSent, qint64 bytesTotal);
 
 private:
@@ -142,6 +148,8 @@ private:
     void redirect(ResourceResponse&, const QUrl&);
     bool wasAborted() const { return !m_resourceHandle; }
     QNetworkReply* sendNetworkRequest(QNetworkAccessManager*, const ResourceRequest&);
+    FormDataIODevice* getIODevice(const ResourceRequest&);
+    void clearContentHeaders();
 
     OwnPtr<QNetworkReplyWrapper> m_replyWrapper;
     ResourceHandle* m_resourceHandle;
@@ -174,9 +182,11 @@ protected:
     qint64 writeData(const char*, qint64);
 
 private:
+    void prepareFormElements(FormData*);
     void moveToNextElement();
     qint64 computeSize();
     void openFileForCurrentElement();
+    void prepareCurrentElement();
 
 private:
     Vector<FormDataElement> m_formElements;

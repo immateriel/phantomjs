@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2008 Nokia Corporation and/or its subsidiary(-ies)
+    Copyright (C) 2008, 2012 Digia Plc. and/or its subsidiary(-ies)
     Copyright (C) 2007 Staikos Computing Services Inc.  <info@staikos.net>
     Copyright (C) 2008 Holger Hans Peter Freyther
 
@@ -21,46 +21,38 @@
 #include "config.h"
 #include "QNetworkReplyHandler.h"
 
+#include "BlobRegistryImpl.h"
 #include "HTTPParsers.h"
 #include "MIMETypeRegistry.h"
 #include "ResourceHandle.h"
 #include "ResourceHandleClient.h"
 #include "ResourceHandleInternal.h"
-#include "ResourceResponse.h"
 #include "ResourceRequest.h"
+#include "ResourceResponse.h"
 #include <QDateTime>
 #include <QFile>
 #include <QFileInfo>
-#include <QNetworkReply>
 #include <QNetworkCookie>
-#include <qwebframe.h>
-#include <qwebpage.h>
+#include <QNetworkReply>
 
 #include <wtf/text/CString.h>
 
-#include <QDebug>
 #include <QCoreApplication>
 
-// In Qt 4.8, the attribute for sending a request synchronously will be made public,
-// for now, use this hackish solution for setting the internal attribute.
-const QNetworkRequest::Attribute gSynchronousNetworkRequestAttribute = static_cast<QNetworkRequest::Attribute>(QNetworkRequest::HttpPipeliningWasUsedAttribute + 7);
-
-static const int gMaxRedirections = 20;
+static const int gMaxRedirections = 10;
 
 namespace WebCore {
 
-// Take a deep copy of the FormDataElement
 FormDataIODevice::FormDataIODevice(FormData* data)
-    : m_formElements(data ? data->elements() : Vector<FormDataElement>())
-    , m_currentFile(0)
+    : m_currentFile(0)
     , m_currentDelta(0)
     , m_fileSize(0)
     , m_dataSize(0)
 {
     setOpenMode(FormDataIODevice::ReadOnly);
 
-    if (!m_formElements.isEmpty() && m_formElements[0].m_type == FormDataElement::encodedFile)
-        openFileForCurrentElement();
+    prepareFormElements(data);
+    prepareCurrentElement();
     computeSize();
 }
 
@@ -68,6 +60,71 @@ FormDataIODevice::~FormDataIODevice()
 {
     delete m_currentFile;
 }
+
+#if ENABLE(BLOB)
+static void appendBlobResolved(FormData* formData, const KURL& url)
+{
+    RefPtr<BlobStorageData> blobData = static_cast<BlobRegistryImpl&>(blobRegistry()).getBlobDataFromURL(KURL(ParsedURLString, url));
+    if (blobData) {
+        BlobDataItemList::const_iterator it = blobData->items().begin();
+        const BlobDataItemList::const_iterator itend = blobData->items().end();
+        for (; it != itend; ++it) {
+            const BlobDataItem& blobItem = *it;
+            if (blobItem.type == BlobDataItem::Data)
+                formData->appendData(blobItem.data->data() + static_cast<int>(blobItem.offset), static_cast<int>(blobItem.length));
+            else if (blobItem.type == BlobDataItem::File)
+                formData->appendFileRange(blobItem.path, blobItem.offset, blobItem.length, blobItem.expectedModificationTime);
+            else if (blobItem.type == BlobDataItem::Blob)
+                appendBlobResolved(formData, blobItem.url);
+            else
+                ASSERT_NOT_REACHED();
+        }
+    }
+}
+#endif
+
+void FormDataIODevice::prepareFormElements(FormData* formData)
+{
+    if (!formData)
+        return;
+
+#if ENABLE(BLOB)
+    bool hasBlob = false;
+    Vector<FormDataElement>::const_iterator it = formData->elements().begin();
+    const Vector<FormDataElement>::const_iterator itend = formData->elements().end();
+    for (; it != itend; ++it) {
+        if (it->m_type == FormDataElement::encodedBlob) {
+            hasBlob = true;
+            break;
+        }
+    }
+
+    // Resolve all blobs so we only have file and data.
+    if (hasBlob) {
+        RefPtr<FormData> newFormData = FormData::create();
+        newFormData->setAlwaysStream(formData->alwaysStream());
+        newFormData->setIdentifier(formData->identifier());
+        it = formData->elements().begin();
+        for (; it != itend; ++it) {
+            const FormDataElement& element = *it;
+            if (element.m_type == FormDataElement::data)
+                newFormData->appendData(element.m_data.data(), element.m_data.size());
+            else if (element.m_type == FormDataElement::encodedFile)
+                newFormData->appendFileRange(element.m_filename, element.m_fileStart, element.m_fileLength, element.m_expectedFileModificationTime, element.m_shouldGenerateFile);
+            else if (element.m_type == FormDataElement::encodedBlob)
+                appendBlobResolved(newFormData.get(), element.m_blobURL);
+            else
+                ASSERT_NOT_REACHED();
+        }
+        m_formElements = newFormData->elements();
+        return;
+    }
+#endif
+
+    // Take a deep copy of the FormDataElements
+    m_formElements = formData->elements();
+}
+
 
 qint64 FormDataIODevice::computeSize() 
 {
@@ -77,7 +134,14 @@ qint64 FormDataIODevice::computeSize()
             m_dataSize += element.m_data.size();
         else {
             QFileInfo fi(element.m_filename);
+#if ENABLE(BLOB)
+            qint64 fileEnd = fi.size();
+            if (element.m_fileLength != BlobDataItem::toEndOfFile)
+                fileEnd = qMin<qint64>(fi.size(), element.m_fileStart + element.m_fileLength);
+            m_fileSize += qMax<qint64>(0, fileEnd - element.m_fileStart);
+#else
             m_fileSize += fi.size();
+#endif
         }
     }
     return m_dataSize + m_fileSize;
@@ -91,10 +155,24 @@ void FormDataIODevice::moveToNextElement()
 
     m_formElements.remove(0);
 
-    if (m_formElements.isEmpty() || m_formElements[0].m_type == FormDataElement::data)
+    prepareCurrentElement();
+}
+
+void FormDataIODevice::prepareCurrentElement()
+{
+    if (m_formElements.isEmpty())
         return;
 
-    openFileForCurrentElement();
+    switch (m_formElements[0].m_type) {
+    case FormDataElement::data:
+        return;
+    case FormDataElement::encodedFile:
+        openFileForCurrentElement();
+        break;
+    default:
+        // At this point encodedBlob should already have been handled.
+        ASSERT_NOT_REACHED();
+    }
 }
 
 void FormDataIODevice::openFileForCurrentElement()
@@ -104,6 +182,17 @@ void FormDataIODevice::openFileForCurrentElement()
 
     m_currentFile->setFileName(m_formElements[0].m_filename);
     m_currentFile->open(QFile::ReadOnly);
+#if ENABLE(BLOB)
+    if (isValidFileTime(m_formElements[0].m_expectedFileModificationTime)) {
+        QFileInfo info(*m_currentFile);
+        if (!info.exists() || static_cast<time_t>(m_formElements[0].m_expectedFileModificationTime) < info.lastModified().toTime_t()) {
+            moveToNextElement();
+            return;
+        }
+    }
+    if (m_formElements[0].m_fileStart)
+        m_currentFile->seek(m_formElements[0].m_fileStart);
+#endif
 }
 
 // m_formElements[0] is the current item. If the destination buffer is
@@ -126,13 +215,23 @@ qint64 FormDataIODevice::readData(char* destination, qint64 size)
 
             if (m_currentDelta == element.m_data.size())
                 moveToNextElement();
-        } else {
-            const QByteArray data = m_currentFile->read(available);
+        } else if (element.m_type == FormDataElement::encodedFile) {
+            quint64 toCopy = available;
+#if ENABLE(BLOB)
+            if (element.m_fileLength != BlobDataItem::toEndOfFile)
+                toCopy = qMin<qint64>(toCopy, element.m_fileLength - m_currentDelta);
+#endif
+            const QByteArray data = m_currentFile->read(toCopy);
             memcpy(destination+copied, data.constData(), data.size());
+            m_currentDelta += data.size();
             copied += data.size();
 
             if (m_currentFile->atEnd() || !m_currentFile->isOpen())
                 moveToNextElement();
+#if ENABLE(BLOB)
+            else if (element.m_fileLength != BlobDataItem::toEndOfFile && m_currentDelta == element.m_fileLength)
+                moveToNextElement();
+#endif
         }
     }
 
@@ -221,7 +320,6 @@ QNetworkReplyWrapper::QNetworkReplyWrapper(QNetworkReplyHandlerCallQueue* queue,
     connect(m_reply, SIGNAL(finished()), this, SLOT(setFinished()));
     connect(m_reply, SIGNAL(finished()), this, SLOT(receiveMetaData()));
     connect(m_reply, SIGNAL(readyRead()), this, SLOT(receiveMetaData()));
-    connect(m_reply, SIGNAL(destroyed()), this, SLOT(replyDestroyed()));
 }
 
 QNetworkReplyWrapper::~QNetworkReplyWrapper()
@@ -236,11 +334,12 @@ QNetworkReply* QNetworkReplyWrapper::release()
     if (!m_reply)
         return 0;
 
-    m_reply->disconnect(this);
+    resetConnections();
     QNetworkReply* reply = m_reply;
     m_reply = 0;
-    m_sniffer = 0;
+    m_sniffer = nullptr;
 
+    reply->setParent(0);
     return reply;
 }
 
@@ -250,10 +349,10 @@ void QNetworkReplyWrapper::synchronousLoad()
     receiveMetaData();
 }
 
-void QNetworkReplyWrapper::stopForwarding()
+void QNetworkReplyWrapper::resetConnections()
 {
     if (m_reply) {
-        // Disconnect all connections that might affect the ResourceHandleClient.
+        // Disconnect all connections except the one to setFinished() slot.
         m_reply->disconnect(this, SLOT(receiveMetaData()));
         m_reply->disconnect(this, SLOT(didReceiveFinished()));
         m_reply->disconnect(this, SLOT(didReceiveReadyRead()));
@@ -264,7 +363,8 @@ void QNetworkReplyWrapper::stopForwarding()
 void QNetworkReplyWrapper::receiveMetaData()
 {
     // This slot is only used to receive the first signal from the QNetworkReply object.
-    stopForwarding();
+    resetConnections();
+
 
     WTF::String contentType = m_reply->header(QNetworkRequest::ContentTypeHeader).toString();
     m_encoding = extractCharsetFromMediaType(contentType);
@@ -287,7 +387,7 @@ void QNetworkReplyWrapper::receiveMetaData()
 
     Q_ASSERT(!m_sniffer);
 
-    m_sniffer = new QtMIMETypeSniffer(m_reply, m_advertisedMIMEType, isSupportedImageType);
+    m_sniffer = adoptPtr(new QtMIMETypeSniffer(m_reply, m_advertisedMIMEType, isSupportedImageType));
 
     if (m_sniffer->isFinished()) {
         receiveSniffedMIMEType();
@@ -302,7 +402,7 @@ void QNetworkReplyWrapper::receiveSniffedMIMEType()
     Q_ASSERT(m_sniffer);
 
     m_sniffedMIMEType = m_sniffer->mimeType();
-    m_sniffer = 0;
+    m_sniffer = nullptr;
 
     emitMetaDataChanged();
 }
@@ -315,12 +415,6 @@ void QNetworkReplyWrapper::setFinished()
     // that don't use the solution. See http://bugreports.qt.nokia.com/browse/QTBUG-11737.
     Q_ASSERT(!isFinished());
     m_reply->setProperty("_q_isFinished", true);
-}
-
-void QNetworkReplyWrapper::replyDestroyed()
-{
-    m_reply = 0;
-    m_sniffer = 0;
 }
 
 void QNetworkReplyWrapper::emitMetaDataChanged()
@@ -353,7 +447,7 @@ void QNetworkReplyWrapper::didReceiveReadyRead()
 void QNetworkReplyWrapper::didReceiveFinished()
 {
     // Disconnecting will make sure that nothing will happen after emitting the finished signal.
-    stopForwarding();
+    resetConnections();
     m_queue->push(&QNetworkReplyHandler::finish);
 }
 
@@ -400,11 +494,12 @@ QNetworkReplyHandler::QNetworkReplyHandler(ResourceHandle* handle, LoadType load
     else
         m_method = QNetworkAccessManager::CustomOperation;
 
-    QObject* originatingObject = 0;
+        QObject* originatingObject = 0;
     if (m_resourceHandle->getInternal()->m_context)
         originatingObject = m_resourceHandle->getInternal()->m_context->originatingObject();
 
     m_request = r.toNetworkRequest(originatingObject);
+
 
     m_queue.push(&QNetworkReplyHandler::start);
 }
@@ -425,12 +520,16 @@ QNetworkReply* QNetworkReplyHandler::release()
         return 0;
 
     QNetworkReply* reply = m_replyWrapper->release();
-    m_replyWrapper = 0;
+    m_replyWrapper = nullptr;
     return reply;
 }
 
 static bool shouldIgnoreHttpError(QNetworkReply* reply, bool receivedData)
 {
+    // An HEAD XmlHTTPRequest shouldn't be marked as failure for HTTP errors.
+    if (reply->operation() == QNetworkAccessManager::HeadOperation)
+        return true;
+
     int httpStatusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
 
     if (httpStatusCode == 401 || httpStatusCode == 407)
@@ -448,32 +547,22 @@ void QNetworkReplyHandler::finish()
 
     ResourceHandleClient* client = m_resourceHandle->client();
     if (!client) {
-        m_replyWrapper = 0;
+        m_replyWrapper = nullptr;
         return;
     }
 
     if (m_replyWrapper->wasRedirected()) {
-        m_replyWrapper = 0;
+        m_replyWrapper = nullptr;
         m_queue.push(&QNetworkReplyHandler::start);
         return;
     }
 
     if (!m_replyWrapper->reply()->error() || shouldIgnoreHttpError(m_replyWrapper->reply(), m_replyWrapper->responseContainsData()))
         client->didFinishLoading(m_resourceHandle, 0);
-    else {
-        QUrl url = m_replyWrapper->reply()->url();
-        int httpStatusCode = m_replyWrapper->reply()->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    else
+        client->didFail(m_resourceHandle, errorForReply(m_replyWrapper->reply()));
 
-        if (httpStatusCode) {
-            ResourceError error("HTTP", httpStatusCode, url.toString(), m_replyWrapper->reply()->attribute(QNetworkRequest::HttpReasonPhraseAttribute).toString());
-            client->didFail(m_resourceHandle, error);
-        } else {
-            ResourceError error("QtNetwork", m_replyWrapper->reply()->error(), url.toString(), m_replyWrapper->reply()->errorString());
-            client->didFail(m_resourceHandle, error);
-        }
-    }
-
-    m_replyWrapper = 0;
+    m_replyWrapper = nullptr;
 }
 
 void QNetworkReplyHandler::sendResponseIfNeeded()
@@ -507,7 +596,7 @@ void QNetworkReplyHandler::sendResponseIfNeeded()
     // The status code is equal to 0 for protocols not in the HTTP family.
     int statusCode = m_replyWrapper->reply()->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
 
-    if (url.protocolInHTTPFamily()) {
+    if (url.protocolIsInHTTPFamily()) {
         String suggestedFilename = filenameFromHTTPContentDisposition(QString::fromLatin1(m_replyWrapper->reply()->rawHeader("Content-Disposition")));
 
         if (!suggestedFilename.isEmpty())
@@ -603,19 +692,43 @@ void QNetworkReplyHandler::uploadProgress(qint64 bytesSent, qint64 bytesTotal)
     if (!client)
         return;
 
+    if (!bytesTotal) {
+        // When finished QNetworkReply emits a progress of 0 bytes.
+        // Ignore that, to avoid firing twice.
+        return;
+    }
+
     client->didSendData(m_resourceHandle, bytesSent, bytesTotal);
+}
+
+void QNetworkReplyHandler::clearContentHeaders()
+{
+    // Clearing Content-length and Content-type of the requests that do not have contents.
+    // This is necessary to ensure POST requests redirected to GETs do not leak metadata
+    // about the POST content to the site they've been redirected to.
+    m_request.setHeader(QNetworkRequest::ContentTypeHeader, QVariant());
+    m_request.setHeader(QNetworkRequest::ContentLengthHeader, QVariant());
+}
+
+FormDataIODevice* QNetworkReplyHandler::getIODevice(const ResourceRequest& request)
+{
+    FormDataIODevice* device = new FormDataIODevice(request.httpBody());
+    // We may be uploading files so prevent QNR from buffering data.
+    m_request.setHeader(QNetworkRequest::ContentLengthHeader, device->getFormDataSize());
+    m_request.setAttribute(QNetworkRequest::DoNotBufferUploadDataAttribute, QVariant(true));
+    return device;
 }
 
 QNetworkReply* QNetworkReplyHandler::sendNetworkRequest(QNetworkAccessManager* manager, const ResourceRequest& request)
 {
     if (m_loadType == SynchronousLoad)
-        m_request.setAttribute(gSynchronousNetworkRequestAttribute, true);
+        m_request.setAttribute(QNetworkRequest::SynchronousRequestAttribute, true);
 
     if (!manager)
         return 0;
 
     const QUrl url = m_request.url();
-    const QString scheme = url.scheme();
+
     // Post requests on files and data don't really make sense, but for
     // fast/forms/form-post-urlencoded.html and for fast/forms/button-state-restore.html
     // we still need to retrieve the file/data, which means we map it to a Get instead.
@@ -623,40 +736,35 @@ QNetworkReply* QNetworkReplyHandler::sendNetworkRequest(QNetworkAccessManager* m
         && (!url.toLocalFile().isEmpty() || url.scheme() == QLatin1String("data")))
         m_method = QNetworkAccessManager::GetOperation;
 
-    if (m_method != QNetworkAccessManager::PostOperation && m_method != QNetworkAccessManager::PutOperation) {
-        // clearing Contents-length and Contents-type of the requests that do not have contents.
-        m_request.setHeader(QNetworkRequest::ContentTypeHeader, QVariant());
-        m_request.setHeader(QNetworkRequest::ContentLengthHeader, QVariant());
-    }
-
     switch (m_method) {
         case QNetworkAccessManager::GetOperation:
+            clearContentHeaders();
             return manager->get(m_request);
         case QNetworkAccessManager::PostOperation: {
-            FormDataIODevice* postDevice = new FormDataIODevice(request.httpBody());
-            // We may be uploading files so prevent QNR from buffering data
-            m_request.setHeader(QNetworkRequest::ContentLengthHeader, postDevice->getFormDataSize());
-            m_request.setAttribute(QNetworkRequest::DoNotBufferUploadDataAttribute, QVariant(true));
+            FormDataIODevice* postDevice = getIODevice(request);
             QNetworkReply* result = manager->post(m_request, postDevice);
             postDevice->setParent(result);
             return result;
         }
         case QNetworkAccessManager::HeadOperation:
+            clearContentHeaders();
             return manager->head(m_request);
         case QNetworkAccessManager::PutOperation: {
-            FormDataIODevice* putDevice = new FormDataIODevice(request.httpBody());
-            // We may be uploading files so prevent QNR from buffering data
-            m_request.setHeader(QNetworkRequest::ContentLengthHeader, putDevice->getFormDataSize());
-            m_request.setAttribute(QNetworkRequest::DoNotBufferUploadDataAttribute, QVariant(true));
+            FormDataIODevice* putDevice = getIODevice(request);
             QNetworkReply* result = manager->put(m_request, putDevice);
             putDevice->setParent(result);
             return result;
         }
         case QNetworkAccessManager::DeleteOperation: {
+            clearContentHeaders();
             return manager->deleteResource(m_request);
         }
-        case QNetworkAccessManager::CustomOperation:
-            return manager->sendCustomRequest(m_request, m_resourceHandle->firstRequest().httpMethod().latin1().data());
+        case QNetworkAccessManager::CustomOperation: {
+            FormDataIODevice* customDevice = getIODevice(request);
+            QNetworkReply* result = manager->sendCustomRequest(m_request, m_resourceHandle->firstRequest().httpMethod().latin1().data(), customDevice);
+            customDevice->setParent(result);
+            return result;
+        }
         case QNetworkAccessManager::UnknownOperation:
             ASSERT_NOT_REACHED();
             return 0;
@@ -674,7 +782,7 @@ void QNetworkReplyHandler::start()
     if (!reply)
         return;
 
-    m_replyWrapper = new QNetworkReplyWrapper(&m_queue, reply, m_resourceHandle->shouldContentSniff() && d->m_context->mimeSniffingEnabled(), this);
+    m_replyWrapper = adoptPtr(new QNetworkReplyWrapper(&m_queue, reply, m_resourceHandle->shouldContentSniff() && d->m_context->mimeSniffingEnabled(), this));
 
     if (m_loadType == SynchronousLoad) {
         m_replyWrapper->synchronousLoad();
@@ -684,6 +792,17 @@ void QNetworkReplyHandler::start()
 
     if (m_resourceHandle->firstRequest().reportUploadProgress())
         connect(m_replyWrapper->reply(), SIGNAL(uploadProgress(qint64, qint64)), this, SLOT(uploadProgress(qint64, qint64)));
+}
+
+ResourceError QNetworkReplyHandler::errorForReply(QNetworkReply* reply)
+{
+    QUrl url = reply->url();
+    int httpStatusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+
+    if (httpStatusCode)
+        return ResourceError("HTTP", httpStatusCode, url.toString(), reply->attribute(QNetworkRequest::HttpReasonPhraseAttribute).toString());
+
+    return ResourceError("QtNetwork", reply->error(), url.toString(), reply->errorString());
 }
 
 }
