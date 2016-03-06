@@ -361,8 +361,8 @@ WebPage::WebPage(QObject *parent, const QUrl &baseUrl, CookieJar *cookieJar)
     qDebug() << "WebPage creation with CookieJar instance:" << cookieJar;
 #endif
 
-//    Config *phantomCfg = Phantom::instance()->config();
-    Config *phantomCfg = phantom->config();
+    Config *phantomCfg = Phantom::instance()->config();
+//    Config *phantomCfg = phantom->config();
     // NOTE: below you can see that between all the event handlers
     // we listen for, "SLOT(setupFrame())" is connected to 2 signals:
     //   1. page.loadFinished

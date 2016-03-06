@@ -101,9 +101,6 @@ void Main::createPhantomJSInstance(quint64 threadId)
 
   phantom->config()->setWebSecurityEnabled(false);
 //  phantom->config()->setProxy("127.0.0.1:3128");
-  phantom->config()->setDiskCacheEnabled(true);
-  phantom->config()->setMaxDiskCacheSize(1024*1024);
-  phantom->config()->setDiskCachePath("/home/julbouln/Travail/phantomjs/cache/");
   phantom->init();
   phantomInstancesMap[threadId] = phantom;
 }
