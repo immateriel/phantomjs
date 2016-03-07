@@ -29,7 +29,7 @@ needs to be executed.
 - Then the javascript string code.
  */
 
-#define SOCKETSERVER_DEBUG
+//#define SOCKETSERVER_DEBUG
 
 SocketServer::SocketServer(QObject *parent)
 {
